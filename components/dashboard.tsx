@@ -2,7 +2,8 @@
 import { WalletConnect } from "@/components/wallet-connect"
 import { TokenList } from "@/components/token-list"
 import { CleanupSummary } from "@/components/cleanup-summary"
-import { PhantomWarning } from "@/components/phantom-warning"
+import { PhantomUnblockInfo } from "@/components/phantom-unblock-info"
+import { EnvironmentWarning } from "@/components/environment-warning"
 import { useWallet } from "@/contexts/wallet-context"
 import { useEffect } from "react"
 
@@ -24,10 +25,12 @@ export function Dashboard() {
 
   return (
     <section className="container mx-auto px-4 py-16">
+      <EnvironmentWarning />
+
       <div className="mx-auto max-w-6xl space-y-8">
         <WalletConnect />
 
-        {connected && publicKey && <PhantomWarning />}
+        {connected && publicKey && <PhantomUnblockInfo />}
 
         {connected && publicKey && (
           <div className="space-y-8">

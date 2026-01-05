@@ -10,8 +10,20 @@ export async function GET() {
       },
     })
 
+    const contentType = response.headers.get("content-type")
+
     if (!response.ok) {
-      throw new Error(`Jupiter API returned ${response.status}`)
+      // Se a resposta não for ok, tenta ler como texto para logar o erro real
+      const errorText = await response.text()
+      console.error("[v0] Jupiter API error:", response.status, errorText)
+      return NextResponse.json({ error: "Jupiter API unavailable" }, { status: 500 })
+    }
+
+    // Verifica se a resposta é JSON válido
+    if (!contentType || !contentType.includes("application/json")) {
+      const responseText = await response.text()
+      console.error("[v0] Jupiter returned non-JSON response:", responseText.substring(0, 100))
+      return NextResponse.json({ error: "Invalid response format" }, { status: 500 })
     }
 
     const tokens = await response.json()
@@ -20,6 +32,6 @@ export async function GET() {
     return NextResponse.json(tokens)
   } catch (error) {
     console.error("[v0] Error fetching token list:", error)
-    return NextResponse.json({ error: "Failed to fetch token list" }, { status: 500 })
+    return NextResponse.json([])
   }
 }

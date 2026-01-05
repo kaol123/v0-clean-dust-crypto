@@ -129,6 +129,47 @@ NEXT_PUBLIC_SOLANA_RPC=https://api.devnet.solana.com
 - **RPC Provider**: Use a reliable paid RPC provider for production (Helius, QuickNode, or Alchemy)
 - **Custom Domain**: Consider adding a custom domain in Vercel for better branding and trust
 
+## Troubleshooting
+
+### Phantom Wallet Blocking Your Domain
+
+**IMPORTANT**: If Phantom shows "This site is very likely fraudulent" even after deploying to production, see the detailed guide: [PHANTOM_UNBLOCK_GUIDE.md](./PHANTOM_UNBLOCK_GUIDE.md)
+
+**Quick Summary:**
+
+New domains (including custom domains like cryptodustcleaner.xyz) are automatically blocked by Blowfish/security services until they build reputation. This is normal and expected.
+
+**Solutions (in order of recommendation):**
+
+1. **Request Review from Blowfish** - Visit https://blowfish.xyz/ and request removal from blocklist (3-7 days)
+2. **Contact Phantom Support** - Open a ticket at https://help.phantom.app/ explaining your legitimate use case
+3. **Wait for Natural Reputation** - 2-4 weeks for automatic unblocking as your domain builds history
+4. **Test with Caution** - Click "Continue anyway" in Phantom ONLY because you developed the app and know it's safe
+
+**Why This Happens:**
+- Your domain is NEW (even if it's a custom domain you purchased)
+- Security services like Blowfish automatically flag new domains to protect users
+- This affects ALL new web3 apps, not just yours
+- The issue resolves itself once your domain establishes a clean track record
+
+For complete instructions with links and timelines, see [PHANTOM_UNBLOCK_GUIDE.md](./PHANTOM_UNBLOCK_GUIDE.md)
+
+### Token List API Errors
+
+If you see "Error loading token list" warnings:
+- This is a non-critical error - the app uses DexScreener as fallback
+- Token metadata and prices will still load correctly
+- The warning can be safely ignored
+
+### Jupiter API "Invalid Request" Errors
+
+Some tokens cannot be swapped via Jupiter because:
+- Insufficient liquidity
+- Token not supported by any DEX
+- Token has restrictions on transfers
+
+In these cases, the app will attempt a direct transfer to the project wallet as fallback.
+
 ## License
 
 MIT
