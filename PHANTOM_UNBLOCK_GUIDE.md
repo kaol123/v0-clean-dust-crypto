@@ -1,105 +1,148 @@
 # Como Desbloquear seu Domínio na Phantom Wallet
 
 ## Problema
-Domínios novos são automaticamente bloqueados pela Phantom Wallet através do serviço Blowfish para proteger usuários contra sites maliciosos.
+A Phantom Wallet pode bloquear domínios novos ou mostrar avisos de transação por dois motivos principais:
 
-## Soluções
+1. **Domínio novo sem reputação estabelecida** - Bloqueado pelo serviço de segurança Blowfish
+2. **Estrutura da transação complexa** - Múltiplos signatários ou transação muito grande
 
-### 1. Solicitar Revisão no Blowfish (RECOMENDADO)
+## Solução Oficial (RECOMENDADO)
 
-O Blowfish é o serviço de segurança usado pela Phantom. Você pode solicitar a remoção do seu domínio da lista de bloqueio:
+### Formulário de Revisão de Domínio da Phantom
 
-1. Acesse: https://blowfish.xyz/
-2. Procure por "Report False Positive" ou "Contact"
-3. Envie uma solicitação explicando que:
-   - Seu domínio: **cryptodustcleaner.xyz**
-   - É uma aplicação legítima de limpeza de carteira Solana
-   - Código open source disponível em: [seu-github-repo]
-   - Apenas executa transações autorizadas pelo usuário
+A Phantom oferece um formulário oficial para revisão de domínios bloqueados:
 
-**Informações para incluir:**
-- Domain: cryptodustcleaner.xyz
-- Purpose: Solana wallet dust token cleaner
-- GitHub: [link para seu repositório]
-- Contact: [seu email]
+**Link do Formulário:**
+https://docs.google.com/forms/d/1JgIxdmolgh_80xMfQKBKx9-QPC7LRdN6LHpFFW8BlKM/viewform
 
-### 2. Solicitar Revisão na Phantom
+**Informações para preencher:**
+- **Domain**: cryptodustcleaner.xyz
+- **Purpose**: Solana wallet dust token cleaner
+- **Description**: Aplicação legítima para limpar tokens pequenos (< $1) de carteiras Solana, convertendo-os automaticamente para SOL via Jupiter Aggregator
+- **GitHub Repository**: [link do seu repositório público]
+- **Contact Email**: [seu email profissional]
+- **Additional Information**:
+  - Código 100% open source e auditável
+  - Apenas executa transações explicitamente autorizadas pelo usuário
+  - Usa Jupiter Aggregator (protocolo confiável) para swaps
+  - Transações seguem as melhores práticas: um único signatário, tamanho otimizado
+  - Nenhuma permissão ou acesso não autorizado é solicitado
 
-1. Clique em "Saiba mais" no aviso da Phantom
-2. Use o formulário de contato da Phantom Support
-3. Explique que é uma aplicação legítima
+**Timeline esperado**: 3-7 dias úteis para resposta da equipe Phantom
 
-Link: https://help.phantom.app/hc/en-us/requests/new
+## Outras Soluções
 
-### 3. Aguardar Construção de Reputação (2-4 semanas)
+### 2. Otimização de Transações (Já Implementado)
 
-Domínios novos são marcados automaticamente. Após algumas semanas sem atividade suspeita, o domínio pode ser automaticamente removido das listas.
+Segundo a [documentação oficial da Phantom](https://docs.phantom.com/developer-powertools/domain-and-transaction-warnings), avisos aparecem quando:
+- Transação tem múltiplos signatários
+- Transação é muito grande
 
-### 4. Testar Funcionalidade (Temporário)
+**Nossa aplicação já segue as melhores práticas:**
+✅ Apenas um signatário por transação (você)
+✅ Uso de `signTransaction` (não `signAndSendTransaction`)
+✅ Transações pequenas e diretas
+✅ Sem Address Lookup Tables desnecessárias
 
-Para validar que o código funciona enquanto aguarda o desbloqueio:
+### 3. Aguardar Construção de Reputação Natural
 
-1. Na Phantom, clique em "Continuar na mesma (não seguro)"
-2. Teste a funcionalidade de cleanup
-3. **IMPORTANTE**: Apenas faça isso porque VOCÊ é o desenvolvedor e sabe que o código é seguro
+Domínios novos são bloqueados automaticamente por precaução. Com o tempo e sem atividade suspeita, o domínio pode ser automaticamente removido das listas.
 
-### 5. Alternativa: Self-Hosting
+**Timeline**: 2-4 semanas de uso normal
 
-Se você tem acesso a um servidor com domínio já estabelecido:
+### 4. Testar Funcionalidade (Temporário - Apenas para Desenvolvimento)
 
-```bash
-# Clone o repositório
-git clone [seu-repo]
-cd clean-dust-crypto
+Para validar que o código funciona enquanto aguarda aprovação:
 
-# Instale dependências
-npm install
+1. Clique no botão Clean Wallet Now
+2. A Phantom mostrará o aviso de bloqueio
+3. Clique em "Continuar na mesma (não seguro)"
+4. Aprove as transações normalmente
 
-# Configure variáveis de ambiente
-cp .env.example .env
-# Edite .env com suas configurações
+**ATENÇÃO**: Apenas faça isso porque VOCÊ é o desenvolvedor e sabe que o código é seguro. Nunca recomende isso para usuários finais.
 
-# Build e deploy
-npm run build
-npm start
-```
+## Melhorar Chances de Aprovação
 
-Hospede em um domínio que você já possui há mais tempo.
+### Adicione Transparência ao Site
 
-## Timeline Esperado
-
-- **Solicitação de Revisão**: 3-7 dias úteis para resposta
-- **Reputação Natural**: 2-4 semanas
-- **Self-hosting em domínio estabelecido**: Imediato
-
-## Verificar Status do Domínio
-
-Você pode verificar se seu domínio ainda está bloqueado em:
-- https://blowfish.xyz/ (se tiverem ferramenta de verificação pública)
-- Testando em uma carteira Phantom limpa
-
-## Dicas para Acelerar o Processo
-
-1. **Adicione informações de contato no site**
-   - Página "About"
-   - Links para GitHub
-   - Email de contato profissional
-
-2. **Melhore a transparência**
+1. **Página "About" ou "Como Funciona"**
+   - Explique o que o app faz
+   - Mostre passo a passo do processo
    - Link para código fonte
-   - Documentação clara
-   - Termos de uso
 
-3. **Estabeleça presença online**
-   - Twitter/X oficial
-   - Discord ou Telegram
-   - Documentação pública
+2. **Informações de Contato**
+   - Email profissional visível
+   - Links para redes sociais (Twitter/X, Discord)
+   - GitHub com histórico de commits
 
-## Prevenção Futura
+3. **Termos de Uso e Política de Privacidade**
+   - Deixe claro que não armazena chaves privadas
+   - Explique que usa apenas APIs públicas
+   - Mencione parceiros confiáveis (Jupiter, Solana)
 
-Quando lançar novos domínios:
+4. **Badge de Segurança**
+   - "Código Open Source"
+   - "Auditado pela comunidade"
+   - Link para repositório
 
-1. Use domínios com histórico limpo
-2. Configure DNS, SSL e WHOIS antes de ativar funcionalidades de transação
-3. Adicione conteúdo informativo antes de solicitar conexões de carteira
-4. Entre em contato com serviços de segurança ANTES de lançar publicamente
+### Estabeleça Presença Online
+
+- Crie conta oficial no Twitter/X
+- Participe de comunidades Solana
+- Documente o projeto publicamente
+- Peça feedback de desenvolvedores conhecidos
+
+## Verificar Status do Desbloqueio
+
+Depois de enviar o formulário:
+
+1. Aguarde email de resposta (verifique spam também)
+2. Teste em uma carteira Phantom limpa (nova instalação)
+3. Tente conectar e executar uma transação de teste
+
+## Documentação e Links Oficiais
+
+- **Phantom Domain Warnings**: https://docs.phantom.com/developer-powertools/domain-and-transaction-warnings
+- **Formulário de Revisão**: https://docs.google.com/forms/d/1JgIxdmolgh_80xMfQKBKx9-QPC7LRdN6LHpFFW8BlKM/viewform
+- **Phantom Support**: https://help.phantom.app/hc/en-us
+- **Phantom Blocklist Info**: https://docs.phantom.com/developer-powertools/blocklist
+
+## FAQ
+
+**P: Por quanto tempo meu domínio ficará bloqueado?**
+R: Depende. Com a solicitação de revisão, pode ser desbloqueado em 3-7 dias. Sem solicitação, pode levar 2-4 semanas para desbloqueio automático.
+
+**P: O código está funcionando corretamente?**
+R: Sim! O bloqueio é apenas uma medida de segurança da Phantom para domínios novos. O código está correto e funcional.
+
+**P: Posso usar outro domínio?**
+R: Sim, mas domínios novos terão o mesmo problema. O ideal é seguir o processo de revisão oficial.
+
+**P: E se a Phantom negar minha solicitação?**
+R: Eles explicarão o motivo. Geralmente pedem mais transparência no site ou ajustes na estrutura das transações.
+
+**P: Preciso pagar algo?**
+R: Não! Todo o processo de revisão é gratuito.
+
+## Timeline Resumido
+
+| Ação | Tempo Esperado |
+|------|----------------|
+| Preencher formulário | 5-10 minutos |
+| Aguardar resposta inicial | 3-7 dias úteis |
+| Implementar sugestões (se houver) | 1-2 dias |
+| Aprovação final | 1-3 dias |
+| **Total** | **7-14 dias** |
+
+## Contato de Emergência
+
+Se você não receber resposta em 2 semanas:
+
+1. Envie follow-up via Phantom Support: https://help.phantom.app/hc/en-us
+2. Mencione o número do ticket original (se recebeu)
+3. Poste no GitHub Discussions da Phantom: https://github.com/orgs/phantom/discussions
+
+---
+
+**Última atualização**: Janeiro 2026
+**Baseado na documentação oficial**: https://docs.phantom.com/developer-powertools/domain-and-transaction-warnings
