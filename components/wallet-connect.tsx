@@ -10,6 +10,11 @@ export function WalletConnect() {
   const { connected, connecting, publicKey, connect, disconnect } = useWallet()
   const { t } = useLanguage()
 
+  const handleConnect = () => {
+    console.log("[v0] ========== CONNECT BUTTON CLICKED ==========")
+    connect()
+  }
+
   return (
     <Card className="border-2 border-border/50 bg-card p-6">
       <div className="flex flex-col items-center gap-6 sm:flex-row sm:justify-between">
@@ -31,7 +36,7 @@ export function WalletConnect() {
               {t.disconnect}
             </Button>
           ) : (
-            <Button onClick={connect} disabled={connecting} size="lg" className="gap-2">
+            <Button onClick={handleConnect} disabled={connecting} size="lg" className="gap-2">
               <Wallet className="h-5 w-5" />
               {connecting ? t.connecting : t.connectButton}
             </Button>

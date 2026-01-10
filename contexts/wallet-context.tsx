@@ -59,15 +59,21 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   }, [state])
 
   const connect = async () => {
-    console.log("[v0] CONNECT START")
+    console.log("[v0] ========== CONNECT FUNCTION CALLED ==========")
+    console.log("[v0] Window location:", typeof window !== "undefined" ? window.location.href : "SSR")
+    console.log("[v0] Window.solana exists:", typeof window !== "undefined" && "solana" in window)
 
     setState((prev) => ({ ...prev, connecting: true }))
 
     try {
-      // @ts-ignore
+      // @ts-ignore - Added detailed checks for Phantom
       const { solana } = window
 
+      console.log("[v0] window.solana:", solana)
+      console.log("[v0] solana.isPhantom:", solana?.isPhantom)
+
       if (!solana?.isPhantom) {
+        console.error("[v0] ❌ Phantom not detected!")
         toast({
           title: "Phantom Not Found",
           description: "Please install the Phantom Wallet extension",
@@ -77,10 +83,16 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         return
       }
 
+      console.log("[v0] ✅ Phantom detected, calling connect()...")
+
       const response = await solana.connect()
+
+      console.log("[v0] ✅ Connect response received:", response)
+      console.log("[v0] Response publicKey:", response.publicKey)
+
       const pubKeyString = response.publicKey.toString()
 
-      console.log("[v0] GOT PUBLIC KEY:", pubKeyString)
+      console.log("[v0] ✅ GOT PUBLIC KEY:", pubKeyString)
 
       stateRef.current = {
         connected: true,
@@ -94,7 +106,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         connecting: false,
       }))
 
-      console.log("[v0] STATE UPDATED - calling fetchTokens...")
+      console.log("[v0] ✅ STATE UPDATED - calling fetchTokens...")
 
       toast({
         title: "Wallet Connected!",
@@ -102,11 +114,16 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       })
 
       await fetchTokens(pubKeyString)
+
+      console.log("[v0] ========== CONNECT COMPLETE ==========")
     } catch (error) {
-      console.error("[v0] Connection error:", error)
+      console.error("[v0] ❌ Connection error:", error)
+      console.error("[v0] Error type:", error instanceof Error ? error.constructor.name : typeof error)
+      console.error("[v0] Error message:", error instanceof Error ? error.message : String(error))
+
       toast({
         title: "Connection Error",
-        description: "Could not connect to wallet",
+        description: error instanceof Error ? error.message : "Could not connect to wallet",
         variant: "destructive",
       })
       setState((prev) => ({ ...prev, connecting: false }))
