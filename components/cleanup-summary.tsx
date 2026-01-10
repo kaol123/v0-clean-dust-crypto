@@ -78,14 +78,16 @@ export function CleanupSummary({ tokens, cleaning, onCleanup }: CleanupSummaryPr
       console.log("[v0] User receives:", result.userReceives, "SOL")
       console.log("[v0] Failed tokens:", result.failedTokens.length)
 
+      const successfulSwaps = dustTokens.length - result.failedTokens.length
+
       if (result.failedTokens.length > 0) {
         setFailedTokens(result.failedTokens)
       }
 
-      if (result.totalSol > 0) {
+      if (successfulSwaps > 0) {
         toast({
           title: "Cleanup Complete!",
-          description: `You received ${result.userReceives.toFixed(6)} SOL. Commission: ${result.commission.toFixed(6)} SOL`,
+          description: `Successfully swapped ${successfulSwaps} token(s). You received ${result.userReceives.toFixed(6)} SOL. Commission: ${result.commission.toFixed(6)} SOL`,
         })
       } else {
         toast({
