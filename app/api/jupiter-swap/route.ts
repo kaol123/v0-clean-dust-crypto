@@ -1,13 +1,13 @@
 import { type NextRequest, NextResponse } from "next/server"
+import { createJupiterApiClient } from "@jup-ag/api"
 
-const JUPITER_QUOTE_API = "https://quote-api.jup.ag/v6/quote"
-const JUPITER_SWAP_API = "https://quote-api.jup.ag/v6/swap"
+const jupiterApi = createJupiterApiClient()
 
 export async function POST(request: NextRequest) {
   try {
     const { inputMint, outputMint, amount, userPublicKey, slippageBps = 500 } = await request.json()
 
-    console.log("[v0] Jupiter API Route - Using direct fetch (no external library)")
+    console.log("[v0] Jupiter API Route - Using @jup-ag/api library")
     console.log("[v0] Swap params:", {
       inputMint,
       outputMint,
@@ -16,47 +16,31 @@ export async function POST(request: NextRequest) {
       slippageBps,
     })
 
-    // Step 1: Get quote from Jupiter
-    const quoteUrl = `${JUPITER_QUOTE_API}?inputMint=${inputMint}&outputMint=${outputMint}&amount=${amount}&slippageBps=${slippageBps}`
-
-    console.log("[v0] Fetching quote from:", quoteUrl)
-
-    const quoteResponse = await fetch(quoteUrl, {
-      method: "GET",
-      headers: {
-        Accept: "application/json",
-      },
-    })
-
-    const quoteText = await quoteResponse.text()
-    console.log("[v0] Quote response status:", quoteResponse.status)
-
-    if (!quoteResponse.ok) {
-      console.error("[v0] Quote request failed:", quoteText)
-
-      const isNoRoute =
-        quoteText.includes("No route found") ||
-        quoteText.includes("TOKEN_NOT_TRADABLE") ||
-        quoteText.includes("insufficient liquidity")
-
-      return NextResponse.json(
-        {
-          error: quoteText || "Failed to get quote",
-          noLiquidity: isNoRoute,
-        },
-        { status: 400 },
-      )
-    }
+    // Step 1: Get quote from Jupiter using the official library
+    console.log("[v0] Fetching quote via @jup-ag/api...")
 
     let quote
     try {
-      quote = JSON.parse(quoteText)
-    } catch (e) {
-      console.error("[v0] Failed to parse quote response:", quoteText)
+      quote = await jupiterApi.quoteGet({
+        inputMint,
+        outputMint,
+        amount: Number(amount),
+        slippageBps,
+      })
+    } catch (quoteError: any) {
+      console.error("[v0] Quote error:", quoteError.message)
+
+      const errorMessage = quoteError.message || "Failed to get quote"
+      const isNoRoute =
+        errorMessage.includes("No route found") ||
+        errorMessage.includes("TOKEN_NOT_TRADABLE") ||
+        errorMessage.includes("insufficient liquidity") ||
+        errorMessage.includes("Could not find any route")
+
       return NextResponse.json(
         {
-          error: "Invalid response from Jupiter",
-          noLiquidity: true,
+          error: errorMessage,
+          noLiquidity: isNoRoute,
         },
         { status: 400 },
       )
@@ -75,47 +59,35 @@ export async function POST(request: NextRequest) {
 
     console.log("[v0] Quote received! Output amount:", quote.outAmount)
 
-    // Step 2: Get swap transaction
-    const swapRequestBody = {
-      quoteResponse: quote,
-      userPublicKey: userPublicKey,
-      wrapAndUnwrapSol: true,
-      dynamicComputeUnitLimit: true,
-    }
+    // Step 2: Get swap transaction using the official library
+    console.log("[v0] Requesting swap transaction via @jup-ag/api...")
 
-    console.log("[v0] Requesting swap transaction...")
-
-    const swapResponse = await fetch(JUPITER_SWAP_API, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-      },
-      body: JSON.stringify(swapRequestBody),
-    })
-
-    const swapText = await swapResponse.text()
-    console.log("[v0] Swap response status:", swapResponse.status)
-
-    if (!swapResponse.ok) {
-      console.error("[v0] Swap request failed:", swapText)
+    let swapResult
+    try {
+      swapResult = await jupiterApi.swapPost({
+        swapRequest: {
+          quoteResponse: quote,
+          userPublicKey: userPublicKey,
+          wrapAndUnwrapSol: true,
+          dynamicComputeUnitLimit: true,
+        },
+      })
+    } catch (swapError: any) {
+      console.error("[v0] Swap error:", swapError.message)
       return NextResponse.json(
         {
-          error: swapText || "Failed to generate swap transaction",
+          error: swapError.message || "Failed to generate swap transaction",
           noLiquidity: false,
         },
         { status: 400 },
       )
     }
 
-    let swapResult
-    try {
-      swapResult = JSON.parse(swapText)
-    } catch (e) {
-      console.error("[v0] Failed to parse swap response:", swapText)
+    if (!swapResult || !swapResult.swapTransaction) {
+      console.error("[v0] No swap transaction generated")
       return NextResponse.json(
         {
-          error: "Invalid swap response from Jupiter",
+          error: "Failed to generate swap transaction",
           noLiquidity: false,
         },
         { status: 400 },
