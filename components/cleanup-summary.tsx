@@ -35,7 +35,16 @@ export function CleanupSummary({ tokens, cleaning, onCleanup }: CleanupSummaryPr
 
   const handleCleanupDirect = async () => {
     console.log("[v0] ========== DIRECT CLEANUP CLICKED ==========")
+    console.log("[v0] Window location:", window.location.href)
     console.log("[v0] Dust tokens:", dustTokens.length)
+    console.log("[v0] Tokens passed to component:", tokens.length)
+    console.log("[v0] window.solana exists:", "solana" in window)
+    // @ts-ignore
+    console.log("[v0] window.solana.isPhantom:", window.solana?.isPhantom)
+    // @ts-ignore
+    console.log("[v0] window.solana.isConnected:", window.solana?.isConnected)
+    // @ts-ignore
+    console.log("[v0] window.solana.publicKey:", window.solana?.publicKey?.toString())
 
     if (dustTokens.length === 0) {
       toast({
@@ -52,27 +61,40 @@ export function CleanupSummary({ tokens, cleaning, onCleanup }: CleanupSummaryPr
       // @ts-ignore
       const { solana } = window
 
+      console.log("[v0] Got window.solana reference")
+
       if (!solana?.isPhantom) {
+        console.error("[v0] ❌ Phantom not detected!")
         throw new Error("Phantom wallet not found. Please install Phantom.")
       }
+
+      console.log("[v0] ✅ Phantom detected")
 
       if (!solana.isConnected) {
         console.log("[v0] Wallet not connected, connecting...")
         await solana.connect()
+        console.log("[v0] ✅ Connected")
+      } else {
+        console.log("[v0] ✅ Wallet already connected")
       }
 
       const publicKey = solana.publicKey?.toString()
+      console.log("[v0] Public key:", publicKey)
+
       if (!publicKey) {
+        console.error("[v0] ❌ Could not get public key!")
         throw new Error("Could not get wallet public key")
       }
 
-      console.log("[v0] Connected wallet:", publicKey)
+      console.log("[v0] ✅ Connected wallet:", publicKey)
       console.log("[v0] Starting swap for", dustTokens.length, "tokens...")
 
       const solanaService = new SolanaService()
+
+      console.log("[v0] Calling swapTokensToSol...")
       const result = await solanaService.swapTokensToSol(dustTokens, publicKey, solana)
 
-      console.log("[v0] Swap completed!")
+      console.log("[v0] ✅ Swap completed!")
       console.log("[v0] Total received:", result.totalSol, "SOL")
       console.log("[v0] Commission:", result.commission, "SOL")
       console.log("[v0] User receives:", result.userReceives, "SOL")
@@ -97,9 +119,14 @@ export function CleanupSummary({ tokens, cleaning, onCleanup }: CleanupSummaryPr
         })
       }
 
+      console.log("[v0] Calling onCleanup callback...")
       onCleanup()
+      console.log("[v0] ========== CLEANUP PROCESS COMPLETE ==========")
     } catch (error: any) {
-      console.error("[v0] Direct cleanup failed:", error)
+      console.error("[v0] ❌ Direct cleanup failed:", error)
+      console.error("[v0] Error name:", error.name)
+      console.error("[v0] Error message:", error.message)
+      console.error("[v0] Error stack:", error.stack)
       toast({
         title: "Cleanup Failed",
         description: error.message || "Could not complete cleanup",
@@ -107,6 +134,7 @@ export function CleanupSummary({ tokens, cleaning, onCleanup }: CleanupSummaryPr
       })
     } finally {
       setIsProcessing(false)
+      console.log("[v0] isProcessing set to false")
     }
   }
 
