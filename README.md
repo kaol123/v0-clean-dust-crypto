@@ -60,8 +60,13 @@ For production, use a reliable RPC provider like:
 3. Filters tokens with total value below $1
 4. Displays cleanup summary with commission breakdown
 5. User confirms cleanup
-6. Tokens are swapped to SOL via Jupiter Aggregator
-7. 10% goes to project wallet, 90% to user wallet
+6. For each dust token:
+   - **First**: Attempts to swap token to SOL via Jupiter Aggregator
+   - **If swap succeeds**: Proceeds to next token
+   - **If swap fails** (no liquidity): Closes the token account to recover rent (~0.002 SOL per account)
+7. From the total SOL collected (swaps + rent recovery):
+   - **10% goes to project wallet** as commission
+   - **90% stays in user wallet**
 
 ## Tech Stack
 
@@ -168,7 +173,12 @@ Some tokens cannot be swapped via Jupiter because:
 - Token not supported by any DEX
 - Token has restrictions on transfers
 
-In these cases, the app will attempt a direct transfer to the project wallet as fallback.
+**In these cases, the app closes the token account to recover the rent** (~0.00203928 SOL per account). This still provides value by:
+- Cleaning up your wallet
+- Recovering the SOL rent that was locked in the token account
+- Simplifying your token list
+
+The recovered rent is included in the total SOL calculation, and the 90/10 split still applies.
 
 ## License
 

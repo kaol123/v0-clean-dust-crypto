@@ -6,6 +6,7 @@ import {
   SystemProgram,
   LAMPORTS_PER_SOL,
 } from "@solana/web3.js"
+import { createCloseAccountInstruction, getAssociatedTokenAddress } from "@solana/spl-token"
 import type { Token } from "@/types/token"
 
 const PROJECT_WALLET = process.env.NEXT_PUBLIC_PROJECT_WALLET || ""
@@ -260,7 +261,13 @@ export class SolanaService {
     tokens: Token[],
     walletPublicKey: string,
     phantomWallet: any,
-  ): Promise<{ totalSol: number; commission: number; userReceives: number; signature: string }> {
+  ): Promise<{
+    totalSol: number
+    commission: number
+    userReceives: number
+    signature: string
+    closedAccounts: number
+  }> {
     try {
       console.log("[v0] ========== STARTING SWAP PROCESS ==========")
       console.log("[v0] Tokens to swap:", tokens.length)
@@ -277,6 +284,7 @@ export class SolanaService {
 
       let totalSolReceived = 0
       const signatures: string[] = []
+      const failedTokens: Token[] = []
 
       for (const token of tokens) {
         try {
@@ -306,6 +314,7 @@ export class SolanaService {
             const errorText = await response.text()
             console.log("[v0] ❌ Jupiter swap failed for", token.symbol, "- Error:", errorText)
             console.log("[v0] Skipping", token.symbol, "- no liquidity available")
+            failedTokens.push(token)
             continue
           }
 
@@ -314,6 +323,7 @@ export class SolanaService {
           if (!data.swapTransaction) {
             console.log("[v0] ❌ No swap transaction returned for", token.symbol)
             console.log("[v0] Skipping", token.symbol)
+            failedTokens.push(token)
             continue
           }
 
@@ -346,12 +356,27 @@ export class SolanaService {
         } catch (error) {
           console.error("[v0] ❌ Error swapping", token.symbol, ":", error)
           console.log("[v0] Skipping", token.symbol, "due to error")
+          failedTokens.push(token)
         }
       }
 
       console.log("[v0] ========================================")
-      console.log("[v0] All swaps completed!")
+      console.log("[v0] Swap phase completed!")
       console.log("[v0] Total SOL received from swaps:", totalSolReceived)
+      console.log("[v0] Failed swaps (will close accounts):", failedTokens.length)
+
+      let closedAccounts = 0
+      if (failedTokens.length > 0) {
+        console.log("[v0] ========================================")
+        console.log("[v0] Closing token accounts to recover rent...")
+        console.log("[v0] Expected rent recovery: ~", (failedTokens.length * 0.00203928).toFixed(6), "SOL")
+
+        closedAccounts = await this.closeTokenAccounts(failedTokens, walletPublicKey, phantomWallet)
+
+        const rentRecovered = closedAccounts * 0.00203928
+        totalSolReceived += rentRecovered
+        console.log("[v0] ✅ Closed", closedAccounts, "accounts, recovered ~", rentRecovered.toFixed(6), "SOL")
+      }
 
       const commission = totalSolReceived * 0.1
       const userReceives = totalSolReceived * 0.9
@@ -393,26 +418,77 @@ export class SolanaService {
       } else if (!PROJECT_WALLET) {
         console.warn("[v0] ⚠️ PROJECT_WALLET not configured - skipping commission transfer")
       } else {
-        console.log("[v0] No SOL swapped - no commission to transfer")
+        console.log("[v0] No SOL from swaps/closures - no commission to transfer")
       }
 
       console.log("[v0] ========== SWAP PROCESS COMPLETED ==========")
       console.log("[v0] Summary:")
-      console.log("[v0]   Total SOL from swaps:", totalSolReceived, "SOL")
+      console.log("[v0]   Total SOL from swaps + closures:", totalSolReceived, "SOL")
       console.log("[v0]   Commission sent to project:", commission, "SOL")
       console.log("[v0]   User keeps in wallet:", userReceives, "SOL")
+      console.log("[v0]   Accounts closed:", closedAccounts)
 
       return {
         totalSol: totalSolReceived,
         commission,
         userReceives,
         signature: signatures[0] || "",
+        closedAccounts,
       }
     } catch (error) {
       console.error("[v0] ========== SWAP PROCESS FAILED ==========")
       console.error("[v0] Fatal error in swap process:", error)
       throw error
     }
+  }
+
+  private async closeTokenAccounts(tokens: Token[], walletPublicKey: string, phantomWallet: any): Promise<number> {
+    let closedCount = 0
+
+    for (const token of tokens) {
+      try {
+        console.log("[v0] Closing account for:", token.symbol, "-", token.mint)
+
+        const userPublicKey = new PublicKey(walletPublicKey)
+        const mintPublicKey = new PublicKey(token.mint)
+
+        // Get the associated token account address
+        const tokenAccount = await getAssociatedTokenAddress(mintPublicKey, userPublicKey)
+
+        console.log("[v0] Token account address:", tokenAccount.toBase58())
+
+        // Create close account instruction
+        const closeInstruction = createCloseAccountInstruction(
+          tokenAccount, // account to close
+          userPublicKey, // destination (receives rent)
+          userPublicKey, // authority
+        )
+
+        const transaction = new Transaction().add(closeInstruction)
+
+        const { blockhash } = await this.connection.getLatestBlockhash()
+        transaction.recentBlockhash = blockhash
+        transaction.feePayer = userPublicKey
+
+        console.log("[v0] Requesting signature to close account...")
+        const signedTx = await phantomWallet.signTransaction(transaction)
+
+        const signature = await this.connection.sendRawTransaction(signedTx.serialize())
+        await this.connection.confirmTransaction(signature, "confirmed")
+
+        console.log("[v0] ✅ Account closed! Signature:", signature)
+        console.log("[v0] Recovered ~0.00203928 SOL rent")
+        closedCount++
+
+        // Small delay between closures
+        await new Promise((resolve) => setTimeout(resolve, 500))
+      } catch (error) {
+        console.error("[v0] ❌ Error closing account for", token.symbol, ":", error)
+        // Continue with other tokens even if one fails
+      }
+    }
+
+    return closedCount
   }
 
   getProjectWallet(): string {
