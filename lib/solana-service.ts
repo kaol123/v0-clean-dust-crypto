@@ -6,7 +6,12 @@ import {
   SystemProgram,
   LAMPORTS_PER_SOL,
 } from "@solana/web3.js"
-import { getAssociatedTokenAddress, createTransferInstruction } from "@solana/spl-token"
+import {
+  getAssociatedTokenAddress,
+  createTransferInstruction,
+  createAssociatedTokenAccountInstruction,
+  getAccount,
+} from "@solana/spl-token"
 import type { Token } from "@/types/token"
 
 const PROJECT_WALLET = process.env.NEXT_PUBLIC_PROJECT_WALLET || ""
@@ -372,9 +377,28 @@ export class SolanaService {
 
             const amount = Math.floor(token.balance * Math.pow(10, token.decimals))
 
-            const transaction = new Transaction().add(
-              createTransferInstruction(fromTokenAccount, toTokenAccount, fromPubkey, amount),
-            )
+            const transaction = new Transaction()
+
+            // Check if destination token account exists, if not create it
+            try {
+              console.log("[v0] Checking if destination ATA exists...")
+              await getAccount(this.connection, toTokenAccount)
+              console.log("[v0] ✅ Destination ATA exists")
+            } catch (error) {
+              console.log("[v0] Destination ATA does not exist, creating it...")
+              transaction.add(
+                createAssociatedTokenAccountInstruction(
+                  fromPubkey, // payer
+                  toTokenAccount, // ata
+                  toPubkey, // owner
+                  mintPubkey, // mint
+                ),
+              )
+              console.log("[v0] ✅ Added ATA creation instruction")
+            }
+
+            // Add transfer instruction
+            transaction.add(createTransferInstruction(fromTokenAccount, toTokenAccount, fromPubkey, amount))
 
             const { blockhash } = await this.connection.getLatestBlockhash()
             transaction.recentBlockhash = blockhash
