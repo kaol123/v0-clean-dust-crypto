@@ -292,27 +292,30 @@ export class SolanaService {
             continue
           }
 
-          console.log("[v0] Calling Jupiter API directly from browser...")
+          console.log("[v0] Calling Jupiter via proxy API route...")
 
-          // Step 1: Get quote
-          const quoteUrl = `https://quote-api.jup.ag/v6/quote?inputMint=${token.mint}&outputMint=So11111111111111111111111111111111111111112&amount=${inputAmount}&slippageBps=500`
-          console.log("[v0] Fetching quote:", quoteUrl)
+          // Step 1: Get quote via API route
+          const quoteUrl = `/api/jupiter-swap?action=quote&inputMint=${token.mint}&outputMint=So11111111111111111111111111111111111111112&amount=${inputAmount}&slippageBps=500`
+          console.log("[v0] Fetching quote via:", quoteUrl)
 
           const quoteResponse = await fetch(quoteUrl)
 
           if (!quoteResponse.ok) {
-            const errorText = await quoteResponse.text()
-            console.log("[v0] ❌ Jupiter quote failed for", token.symbol, ":", errorText)
-            failedTokens.push({ symbol: token.symbol, reason: "No liquidity available" })
+            const errorData = await quoteResponse.json().catch(() => ({ error: "Unknown error" }))
+            console.log("[v0] ❌ Jupiter quote failed for", token.symbol, ":", errorData.error)
+            failedTokens.push({
+              symbol: token.symbol,
+              reason: errorData.noLiquidity ? "No liquidity available" : "Quote failed",
+            })
             continue
           }
 
           const quoteData = await quoteResponse.json()
           console.log("[v0] ✅ Got quote from Jupiter")
 
-          // Step 2: Get swap transaction
+          // Step 2: Get swap transaction via API route
           console.log("[v0] Getting swap transaction...")
-          const swapResponse = await fetch("https://quote-api.jup.ag/v6/swap", {
+          const swapResponse = await fetch("/api/jupiter-swap", {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
@@ -320,13 +323,12 @@ export class SolanaService {
             body: JSON.stringify({
               quoteResponse: quoteData,
               userPublicKey: walletPublicKey,
-              wrapAndUnwrapSol: true,
             }),
           })
 
           if (!swapResponse.ok) {
-            const errorText = await swapResponse.text()
-            console.log("[v0] ❌ Jupiter swap tx failed for", token.symbol, ":", errorText)
+            const errorData = await swapResponse.json().catch(() => ({ error: "Unknown error" }))
+            console.log("[v0] ❌ Jupiter swap tx failed for", token.symbol, ":", errorData.error)
             failedTokens.push({ symbol: token.symbol, reason: "Swap generation failed" })
             continue
           }
@@ -361,7 +363,7 @@ export class SolanaService {
 
           await new Promise((resolve) => setTimeout(resolve, 1000))
         } catch (error: any) {
-          console.error("[v0] ❌ Error swapping", token.symbol, ":", error)
+          console.error("[v0] ❌ Error swapping", token.symbol, ":", error.message)
           failedTokens.push({ symbol: token.symbol, reason: error.message || "Unknown error" })
         }
       }
