@@ -17,7 +17,6 @@ if (!PROJECT_WALLET) {
 // Solana RPC endpoint
 const RPC_ENDPOINT = process.env.NEXT_PUBLIC_SOLANA_RPC || "https://api.mainnet-beta.solana.com"
 const JUPITER_QUOTE_API = "https://quote-api.jup.ag/v6"
-const JUPITER_PRICE_API = "https://api.jup.ag/price/v3"
 
 let tokenListCache: Map<string, { symbol: string; name: string; logoURI?: string }> | null = null
 
@@ -60,18 +59,9 @@ export class SolanaService {
   }
 
   private async getTokenMetadata(mint: string): Promise<{ symbol: string; name: string; logoURI?: string }> {
-    const tokenList = await this.loadTokenList()
-
-    // First check Jupiter token list
-    const jupiterData = tokenList.get(mint)
-    if (jupiterData) {
-      console.log("[v0] Found", mint.slice(0, 6), "in Jupiter list:", jupiterData.symbol)
-      return jupiterData
-    }
-
     // Fallback to DexScreener API for token info
     try {
-      console.log("[v0] Token", mint.slice(0, 6), "not in Jupiter list, checking DexScreener...")
+      console.log("[v0] Fetching metadata from DexScreener for", mint.slice(0, 6))
       const response = await fetch(`https://api.dexscreener.com/latest/dex/tokens/${mint}`)
       const data = await response.json()
 
@@ -303,65 +293,43 @@ export class SolanaService {
             continue
           }
 
-          console.log("[v0] Attempting swap via Jupiter directly (client-side)...")
+          console.log("[v0] Attempting swap via Jupiter API route (server-side)...")
 
-          // Step 1: Get quote
-          const quoteUrl = `https://quote-api.jup.ag/v6/quote?inputMint=${token.mint}&outputMint=So11111111111111111111111111111111111111112&amount=${inputAmount}&slippageBps=500`
-          console.log("[v0] Fetching quote from Jupiter...")
-
-          const quoteResponse = await fetch(quoteUrl, {
+          const jupiterResponse = await fetch("/api/jupiter-swap", {
+            method: "POST",
             headers: {
-              Accept: "application/json",
+              "Content-Type": "application/json",
             },
+            body: JSON.stringify({
+              inputMint: token.mint,
+              outputMint: "So11111111111111111111111111111111111111112",
+              amount: inputAmount,
+              userPublicKey: walletPublicKey,
+              slippageBps: 500, // 5% slippage for dust tokens
+            }),
           })
 
-          if (!quoteResponse.ok) {
-            const errorText = await quoteResponse.text()
-            console.log("[v0] ❌ Jupiter quote failed for", token.symbol, "- Error:", errorText)
+          if (!jupiterResponse.ok) {
+            const errorData = await jupiterResponse.json()
+            console.log("[v0] ❌ Jupiter API failed for", token.symbol, "- Error:", errorData.error)
             failedTokens.push({ symbol: token.symbol, reason: "No liquidity available" })
             continue
           }
 
-          const quoteData = await quoteResponse.json()
-          console.log("[v0] ✅ Got quote from Jupiter, outAmount:", quoteData.outAmount)
+          const jupiterData = await jupiterResponse.json()
 
-          // Step 2: Get swap transaction
-          const swapResponse = await fetch("https://quote-api.jup.ag/v6/swap", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Accept: "application/json",
-            },
-            body: JSON.stringify({
-              quoteResponse: quoteData,
-              userPublicKey: walletPublicKey,
-              wrapAndUnwrapSol: true,
-              dynamicComputeUnitLimit: true,
-              prioritizationFeeLamports: "auto",
-            }),
-          })
-
-          if (!swapResponse.ok) {
-            const errorText = await swapResponse.text()
-            console.log("[v0] ❌ Jupiter swap transaction failed for", token.symbol, "- Error:", errorText)
-            failedTokens.push({ symbol: token.symbol, reason: "Unable to create swap transaction" })
-            continue
-          }
-
-          const swapData = await swapResponse.json()
-
-          if (!swapData.swapTransaction) {
+          if (!jupiterData.success || !jupiterData.swapTransaction) {
             console.log("[v0] ❌ No swap transaction returned for", token.symbol)
             failedTokens.push({ symbol: token.symbol, reason: "Jupiter unable to generate swap" })
             continue
           }
 
-          console.log("[v0] ✅ Got swap transaction from Jupiter")
-          const expectedSol = Number(quoteData.outAmount) / LAMPORTS_PER_SOL
+          console.log("[v0] ✅ Got swap transaction from Jupiter via API route")
+          const expectedSol = Number(jupiterData.outAmount) / LAMPORTS_PER_SOL
           console.log("[v0] Expected SOL output:", expectedSol)
 
           // Step 3: Sign and send transaction
-          const swapTransactionBuf = Buffer.from(swapData.swapTransaction, "base64")
+          const swapTransactionBuf = Buffer.from(jupiterData.swapTransaction, "base64")
           const transaction = VersionedTransaction.deserialize(swapTransactionBuf)
 
           console.log("[v0] Requesting signature from Phantom...")
