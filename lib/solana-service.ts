@@ -286,50 +286,59 @@ export class SolanaService {
           const inputAmount = Math.floor(token.balance * Math.pow(10, token.decimals))
           console.log("[v0] Input amount (raw):", inputAmount)
 
-          // Skip if amount is too small (less than 1 token unit)
           if (inputAmount < 1) {
             console.log("[v0] ⚠️ Amount too small to swap, skipping", token.symbol)
             failedTokens.push({ symbol: token.symbol, reason: "Amount too small" })
             continue
           }
 
-          console.log("[v0] Attempting swap via Jupiter API route (server-side)...")
+          console.log("[v0] Calling Jupiter API directly from browser...")
 
-          const jupiterResponse = await fetch("/api/jupiter-swap", {
+          // Step 1: Get quote
+          const quoteUrl = `https://quote-api.jup.ag/v6/quote?inputMint=${token.mint}&outputMint=So11111111111111111111111111111111111111112&amount=${inputAmount}&slippageBps=500`
+          console.log("[v0] Fetching quote:", quoteUrl)
+
+          const quoteResponse = await fetch(quoteUrl)
+
+          if (!quoteResponse.ok) {
+            const errorText = await quoteResponse.text()
+            console.log("[v0] ❌ Jupiter quote failed for", token.symbol, ":", errorText)
+            failedTokens.push({ symbol: token.symbol, reason: "No liquidity available" })
+            continue
+          }
+
+          const quoteData = await quoteResponse.json()
+          console.log("[v0] ✅ Got quote from Jupiter")
+
+          // Step 2: Get swap transaction
+          console.log("[v0] Getting swap transaction...")
+          const swapResponse = await fetch("https://quote-api.jup.ag/v6/swap", {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
             },
             body: JSON.stringify({
-              inputMint: token.mint,
-              outputMint: "So11111111111111111111111111111111111111112",
-              amount: inputAmount,
+              quoteResponse: quoteData,
               userPublicKey: walletPublicKey,
-              slippageBps: 500, // 5% slippage for dust tokens
+              wrapAndUnwrapSol: true,
             }),
           })
 
-          if (!jupiterResponse.ok) {
-            const errorData = await jupiterResponse.json()
-            console.log("[v0] ❌ Jupiter API failed for", token.symbol, "- Error:", errorData.error)
-            failedTokens.push({ symbol: token.symbol, reason: "No liquidity available" })
+          if (!swapResponse.ok) {
+            const errorText = await swapResponse.text()
+            console.log("[v0] ❌ Jupiter swap tx failed for", token.symbol, ":", errorText)
+            failedTokens.push({ symbol: token.symbol, reason: "Swap generation failed" })
             continue
           }
 
-          const jupiterData = await jupiterResponse.json()
+          const { swapTransaction } = await swapResponse.json()
+          console.log("[v0] ✅ Got swap transaction from Jupiter")
 
-          if (!jupiterData.success || !jupiterData.swapTransaction) {
-            console.log("[v0] ❌ No swap transaction returned for", token.symbol)
-            failedTokens.push({ symbol: token.symbol, reason: "Jupiter unable to generate swap" })
-            continue
-          }
-
-          console.log("[v0] ✅ Got swap transaction from Jupiter via API route")
-          const expectedSol = Number(jupiterData.outAmount) / LAMPORTS_PER_SOL
+          const expectedSol = Number(quoteData.outAmount) / LAMPORTS_PER_SOL
           console.log("[v0] Expected SOL output:", expectedSol)
 
           // Step 3: Sign and send transaction
-          const swapTransactionBuf = Buffer.from(jupiterData.swapTransaction, "base64")
+          const swapTransactionBuf = Buffer.from(swapTransaction, "base64")
           const transaction = VersionedTransaction.deserialize(swapTransactionBuf)
 
           console.log("[v0] Requesting signature from Phantom...")
@@ -350,7 +359,6 @@ export class SolanaService {
           signatures.push(signature)
           totalSolReceived += expectedSol
 
-          // Small delay between transactions
           await new Promise((resolve) => setTimeout(resolve, 1000))
         } catch (error: any) {
           console.error("[v0] ❌ Error swapping", token.symbol, ":", error)
