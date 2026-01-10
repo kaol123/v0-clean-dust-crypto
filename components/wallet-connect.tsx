@@ -5,13 +5,24 @@ import { Card } from "@/components/ui/card"
 import { Wallet, Power } from "lucide-react"
 import { useWallet } from "@/contexts/wallet-context"
 import { useLanguage } from "@/contexts/language-context"
+import { useEffect } from "react"
 
 export function WalletConnect() {
   const { connected, connecting, publicKey, connect, disconnect } = useWallet()
   const { t } = useLanguage()
 
+  useEffect(() => {
+    console.log("[v0] ========== WALLET CONNECT RENDER ==========")
+    console.log("[v0] connected:", connected)
+    console.log("[v0] connecting:", connecting)
+    console.log("[v0] publicKey:", publicKey)
+    console.log("[v0] Button visible:", !connected)
+    console.log("[v0] ==============================================")
+  }, [connected, connecting, publicKey])
+
   const handleConnect = () => {
     console.log("[v0] ========== CONNECT BUTTON CLICKED ==========")
+    console.log("[v0] About to call connect()")
     connect()
   }
 
