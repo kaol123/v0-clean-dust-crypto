@@ -2,12 +2,13 @@
 
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Sparkles, TrendingUp, Percent } from "lucide-react"
+import { Sparkles, TrendingUp, Percent, AlertCircle, ExternalLink } from "lucide-react"
 import type { Token } from "@/types/token"
 import { useLanguage } from "@/contexts/language-context"
 import { useState } from "react"
 import { useToast } from "@/hooks/use-toast"
 import { SolanaService } from "@/lib/solana-service"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 
 interface CleanupSummaryProps {
   tokens: Token[]
@@ -19,6 +20,7 @@ export function CleanupSummary({ tokens, cleaning, onCleanup }: CleanupSummaryPr
   const { t } = useLanguage()
   const { toast } = useToast()
   const [isProcessing, setIsProcessing] = useState(false)
+  const [failedTokens, setFailedTokens] = useState<{ symbol: string; reason: string }[]>([])
 
   const dustTokens = tokens.filter((token) => token.usdValue < 1)
 
@@ -44,6 +46,7 @@ export function CleanupSummary({ tokens, cleaning, onCleanup }: CleanupSummaryPr
     }
 
     setIsProcessing(true)
+    setFailedTokens([])
 
     try {
       // @ts-ignore
@@ -69,15 +72,28 @@ export function CleanupSummary({ tokens, cleaning, onCleanup }: CleanupSummaryPr
       const solanaService = new SolanaService()
       const result = await solanaService.swapTokensToSol(dustTokens, publicKey, solana)
 
-      console.log("[v0] Swap completed successfully!")
+      console.log("[v0] Swap completed!")
       console.log("[v0] Total received:", result.totalSol, "SOL")
       console.log("[v0] Commission:", result.commission, "SOL")
       console.log("[v0] User receives:", result.userReceives, "SOL")
+      console.log("[v0] Failed tokens:", result.failedTokens.length)
 
-      toast({
-        title: "Cleanup Complete!",
-        description: `You received ${result.userReceives.toFixed(6)} SOL. Commission: ${result.commission.toFixed(6)} SOL`,
-      })
+      if (result.failedTokens.length > 0) {
+        setFailedTokens(result.failedTokens)
+      }
+
+      if (result.totalSol > 0) {
+        toast({
+          title: "Cleanup Complete!",
+          description: `You received ${result.userReceives.toFixed(6)} SOL. Commission: ${result.commission.toFixed(6)} SOL`,
+        })
+      } else {
+        toast({
+          title: "No Swaps Completed",
+          description: "Unable to swap any tokens. See details below.",
+          variant: "destructive",
+        })
+      }
 
       onCleanup()
     } catch (error: any) {
@@ -112,56 +128,97 @@ export function CleanupSummary({ tokens, cleaning, onCleanup }: CleanupSummaryPr
   }
 
   return (
-    <Card className="border-2 border-primary/20 bg-gradient-to-br from-primary/5 to-accent/5 p-6">
-      <div className="mb-6 flex items-center gap-2">
-        <Sparkles className="h-5 w-5 text-primary" />
-        <h3 className="text-xl font-semibold">{t.cleanupSummary}</h3>
-      </div>
+    <div className="space-y-4">
+      {failedTokens.length > 0 && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Some Tokens Could Not Be Swapped</AlertTitle>
+          <AlertDescription className="mt-2">
+            <p className="mb-2">The following tokens failed to swap:</p>
+            <ul className="list-disc pl-5 space-y-1">
+              {failedTokens.map((token, i) => (
+                <li key={i}>
+                  <strong>{token.symbol}</strong>: {token.reason}
+                </li>
+              ))}
+            </ul>
+            <div className="mt-3 flex items-start gap-2 rounded-md bg-destructive/10 p-3">
+              <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+              <div className="text-sm">
+                <p className="font-medium mb-1">Alternative Solution:</p>
+                <p className="mb-2">
+                  You can swap these tokens directly in Phantom wallet using their built-in swap feature:
+                </p>
+                <ol className="list-decimal pl-5 space-y-1">
+                  <li>Open Phantom wallet</li>
+                  <li>Click on the token you want to swap</li>
+                  <li>Click "Swap" button</li>
+                  <li>Select SOL as output</li>
+                  <li>Complete the swap</li>
+                </ol>
+                <a
+                  href="https://help.phantom.app/hc/en-us/articles/4406388623251-How-to-swap-tokens-in-Phantom"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-2 inline-flex items-center gap-1 text-primary hover:underline"
+                >
+                  Learn more about swapping in Phantom
+                  <ExternalLink className="h-3 w-3" />
+                </a>
+              </div>
+            </div>
+          </AlertDescription>
+        </Alert>
+      )}
 
-      <div className="mb-6 grid gap-4 md:grid-cols-3">
-        <div className="rounded-lg bg-background/50 p-4">
-          <div className="mb-1 flex items-center gap-2 text-sm text-muted-foreground">
-            <TrendingUp className="h-4 w-4" />
-            {t.totalValue}
-          </div>
-          <p className="text-2xl font-bold">{totalValueSol.toFixed(6)} SOL</p>
-          <p className="text-sm text-muted-foreground">${totalValueUsd.toFixed(4)} USD</p>
+      <Card className="border-2 border-primary/20 bg-gradient-to-br from-primary/5 to-accent/5 p-6">
+        <div className="mb-6 flex items-center gap-2">
+          <Sparkles className="h-5 w-5 text-primary" />
+          <h3 className="text-xl font-semibold">{t.cleanupSummary}</h3>
         </div>
 
-        <div className="rounded-lg bg-background/50 p-4">
-          <div className="mb-1 flex items-center gap-2 text-sm text-muted-foreground">
-            <Percent className="h-4 w-4" />
-            {t.commissionLabel}
+        <div className="mb-6 grid gap-4 md:grid-cols-3">
+          <div className="rounded-lg bg-background/50 p-4">
+            <div className="mb-1 flex items-center gap-2 text-sm text-muted-foreground">
+              <TrendingUp className="h-4 w-4" />
+              {t.totalValue}
+            </div>
+            <p className="text-2xl font-bold">{totalValueSol.toFixed(6)} SOL</p>
+            <p className="text-sm text-muted-foreground">${totalValueUsd.toFixed(4)} USD</p>
           </div>
-          <p className="text-2xl font-bold">{commissionSol.toFixed(6)} SOL</p>
-          <p className="text-sm text-muted-foreground">${commissionUsd.toFixed(4)} USD</p>
+
+          <div className="rounded-lg bg-background/50 p-4">
+            <div className="mb-1 flex items-center gap-2 text-sm text-muted-foreground">
+              <Percent className="h-4 w-4" />
+              {t.commissionLabel}
+            </div>
+            <p className="text-2xl font-bold">{commissionSol.toFixed(6)} SOL</p>
+            <p className="text-sm text-muted-foreground">${commissionUsd.toFixed(4)} USD</p>
+          </div>
+
+          <div className="rounded-lg bg-accent/10 p-4">
+            <div className="mb-1 flex items-center gap-2 text-sm text-accent">
+              <Sparkles className="h-4 w-4" />
+              {t.youReceive}
+            </div>
+            <p className="text-2xl font-bold text-accent">{youReceiveSol.toFixed(6)} SOL</p>
+            <p className="text-sm text-accent/80">${youReceiveUsd.toFixed(4)} USD</p>
+          </div>
         </div>
 
-        <div className="rounded-lg bg-accent/10 p-4">
-          <div className="mb-1 flex items-center gap-2 text-sm text-accent">
-            <Sparkles className="h-4 w-4" />
-            {t.youReceive}
-          </div>
-          <p className="text-2xl font-bold text-accent">{youReceiveSol.toFixed(6)} SOL</p>
-          <p className="text-sm text-accent/80">${youReceiveUsd.toFixed(4)} USD</p>
-        </div>
-      </div>
-
-      <Button
-        onClick={() => {
-          console.log("[v0] BUTTON ONCLICK FIRED!!!")
-          handleCleanupDirect()
-        }}
-        onMouseEnter={() => console.log("[v0] Button mouse enter")}
-        onMouseLeave={() => console.log("[v0] Button mouse leave")}
-        disabled={isLoading}
-        size="lg"
-        className="relative z-50 w-full gap-2 bg-gradient-to-r from-primary to-accent text-lg font-semibold pointer-events-auto hover:opacity-90 transition-opacity cursor-pointer"
-        style={{ pointerEvents: "auto" }}
-      >
-        <Sparkles className="h-5 w-5" />
-        {isLoading ? t.cleaning : t.cleanWalletNow}
-      </Button>
-    </Card>
+        <Button
+          onClick={() => {
+            console.log("[v0] BUTTON ONCLICK FIRED!!!")
+            handleCleanupDirect()
+          }}
+          disabled={isLoading}
+          size="lg"
+          className="w-full gap-2 bg-gradient-to-r from-primary to-accent text-lg font-semibold hover:opacity-90 transition-opacity"
+        >
+          <Sparkles className="h-5 w-5" />
+          {isLoading ? t.cleaning : t.cleanWalletNow}
+        </Button>
+      </Card>
+    </div>
   )
 }

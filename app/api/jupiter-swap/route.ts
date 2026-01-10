@@ -1,10 +1,15 @@
 import { type NextRequest, NextResponse } from "next/server"
+import { Connection, PublicKey } from "@solana/web3.js"
+import { createJupiterApiClient } from "@jup-ag/api"
+
+const RPC_ENDPOINT = process.env.NEXT_PUBLIC_SOLANA_RPC || "https://api.mainnet-beta.solana.com"
 
 export async function POST(request: NextRequest) {
   try {
-    const { inputMint, outputMint, amount, userPublicKey, slippageBps = 300 } = await request.json()
+    const { inputMint, outputMint, amount, userPublicKey, slippageBps = 500 } = await request.json()
 
-    console.log("[v0] Jupiter API Route - Getting quote for:", {
+    console.log("[v0] Jupiter API Route - Using official @jup-ag/api library")
+    console.log("[v0] Swap params:", {
       inputMint,
       outputMint,
       amount,
@@ -12,79 +17,64 @@ export async function POST(request: NextRequest) {
       slippageBps,
     })
 
-    const quoteUrl = `https://quote-api.jup.ag/v6/quote?inputMint=${inputMint}&outputMint=${outputMint}&amount=${amount}&slippageBps=${slippageBps}`
+    const connection = new Connection(RPC_ENDPOINT)
+    const jupiterQuoteApi = createJupiterApiClient()
 
-    console.log("[v0] Fetching quote from:", quoteUrl)
+    console.log("[v0] Fetching quote using Jupiter SDK...")
 
-    const quoteResponse = await fetch(quoteUrl, {
-      headers: {
-        Accept: "application/json",
-      },
+    const quote = await jupiterQuoteApi.quoteGet({
+      inputMint,
+      outputMint,
+      amount: Number(amount),
+      slippageBps,
     })
 
-    const contentType = quoteResponse.headers.get("content-type")
-
-    if (!quoteResponse.ok || !contentType?.includes("application/json")) {
-      const errorText = await quoteResponse.text()
-      console.error("[v0] Quote error (non-JSON or failed):", errorText)
+    if (!quote) {
+      console.error("[v0] No quote received from Jupiter")
       return NextResponse.json(
         {
-          error: `Jupiter quote failed: ${errorText}`,
+          error: "No liquidity available for this token",
           noLiquidity: true,
         },
         { status: 400 },
       )
     }
 
-    const quoteData = await quoteResponse.json()
-    console.log("[v0] Quote received, outAmount:", quoteData.outAmount)
+    console.log("[v0] Quote received! Output amount:", quote.outAmount)
 
-    const swapResponse = await fetch("https://quote-api.jup.ag/v6/swap", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-      },
-      body: JSON.stringify({
-        quoteResponse: quoteData,
-        userPublicKey,
+    const swapResult = await jupiterQuoteApi.swapPost({
+      swapRequest: {
+        quoteResponse: quote,
+        userPublicKey: new PublicKey(userPublicKey),
         wrapAndUnwrapSol: true,
         dynamicComputeUnitLimit: true,
         prioritizationFeeLamports: "auto",
-      }),
+      },
     })
 
-    const swapContentType = swapResponse.headers.get("content-type")
-
-    if (!swapResponse.ok || !swapContentType?.includes("application/json")) {
-      const errorText = await swapResponse.text()
-      console.error("[v0] Swap error (non-JSON or failed):", errorText)
-      return NextResponse.json(
-        {
-          error: `Jupiter swap failed: ${errorText}`,
-          noLiquidity: true,
-        },
-        { status: 400 },
-      )
-    }
-
-    const swapData = await swapResponse.json()
-    console.log("[v0] Swap transaction received successfully")
+    console.log("[v0] Swap transaction generated successfully")
 
     return NextResponse.json({
       success: true,
-      quote: quoteData,
-      swapTransaction: swapData.swapTransaction,
-      outAmount: quoteData.outAmount,
+      quote,
+      swapTransaction: swapResult.swapTransaction,
+      outAmount: quote.outAmount,
     })
   } catch (error: any) {
     console.error("[v0] Jupiter API Route exception:", error)
+
+    const errorMessage = error.message || "Internal server error"
+    const isLiquidityError =
+      errorMessage.includes("No route found") ||
+      errorMessage.includes("insufficient liquidity") ||
+      errorMessage.includes("No quotes")
+
     return NextResponse.json(
       {
-        error: error.message || "Internal server error",
-        noLiquidity: true,
+        error: errorMessage,
+        noLiquidity: isLiquidityError,
       },
-      { status: 500 },
+      { status: isLiquidityError ? 400 : 500 },
     )
   }
 }

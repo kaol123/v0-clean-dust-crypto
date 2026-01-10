@@ -292,54 +292,38 @@ export class SolanaService {
             continue
           }
 
-          console.log("[v0] Calling Jupiter via proxy API route...")
+          console.log("[v0] Calling Jupiter via API route...")
 
-          // Step 1: Get quote via API route
-          const quoteUrl = `/api/jupiter-swap?action=quote&inputMint=${token.mint}&outputMint=So11111111111111111111111111111111111111112&amount=${inputAmount}&slippageBps=500`
-          console.log("[v0] Fetching quote via:", quoteUrl)
-
-          const quoteResponse = await fetch(quoteUrl)
-
-          if (!quoteResponse.ok) {
-            const errorData = await quoteResponse.json().catch(() => ({ error: "Unknown error" }))
-            console.log("[v0] ❌ Jupiter quote failed for", token.symbol, ":", errorData.error)
-            failedTokens.push({
-              symbol: token.symbol,
-              reason: errorData.noLiquidity ? "No liquidity available" : "Quote failed",
-            })
-            continue
-          }
-
-          const quoteData = await quoteResponse.json()
-          console.log("[v0] ✅ Got quote from Jupiter")
-
-          // Step 2: Get swap transaction via API route
-          console.log("[v0] Getting swap transaction...")
-          const swapResponse = await fetch("/api/jupiter-swap", {
+          const apiResponse = await fetch("/api/jupiter-swap", {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
             },
             body: JSON.stringify({
-              quoteResponse: quoteData,
+              inputMint: token.mint,
+              outputMint: "So11111111111111111111111111111111111111112",
+              amount: inputAmount.toString(),
               userPublicKey: walletPublicKey,
+              slippageBps: 500,
             }),
           })
 
-          if (!swapResponse.ok) {
-            const errorData = await swapResponse.json().catch(() => ({ error: "Unknown error" }))
-            console.log("[v0] ❌ Jupiter swap tx failed for", token.symbol, ":", errorData.error)
-            failedTokens.push({ symbol: token.symbol, reason: "Swap generation failed" })
+          if (!apiResponse.ok) {
+            const errorData = await apiResponse.json().catch(() => ({ error: "Unknown error" }))
+            console.log("[v0] ❌ Jupiter API route failed for", token.symbol, ":", errorData.error)
+            failedTokens.push({
+              symbol: token.symbol,
+              reason: errorData.noLiquidity ? "No liquidity available" : "Swap failed",
+            })
             continue
           }
 
-          const { swapTransaction } = await swapResponse.json()
-          console.log("[v0] ✅ Got swap transaction from Jupiter")
+          const { quote, swapTransaction, outAmount } = await apiResponse.json()
+          console.log("[v0] ✅ Got swap transaction from Jupiter API route")
 
-          const expectedSol = Number(quoteData.outAmount) / LAMPORTS_PER_SOL
+          const expectedSol = Number(outAmount) / LAMPORTS_PER_SOL
           console.log("[v0] Expected SOL output:", expectedSol)
 
-          // Step 3: Sign and send transaction
           const swapTransactionBuf = Buffer.from(swapTransaction, "base64")
           const transaction = VersionedTransaction.deserialize(swapTransactionBuf)
 
@@ -364,7 +348,10 @@ export class SolanaService {
           await new Promise((resolve) => setTimeout(resolve, 1000))
         } catch (error: any) {
           console.error("[v0] ❌ Error swapping", token.symbol, ":", error.message)
-          failedTokens.push({ symbol: token.symbol, reason: error.message || "Unknown error" })
+          failedTokens.push({
+            symbol: token.symbol,
+            reason: error.message || "Unknown error",
+          })
         }
       }
 
@@ -423,7 +410,10 @@ export class SolanaService {
       console.log("[v0]   User keeps in wallet:", userReceives, "SOL")
       console.log("[v0]   Failed tokens:", failedTokens.length)
       if (failedTokens.length > 0) {
-        console.log("[v0]   Tokens without liquidity:", failedTokens.map((t) => t.symbol).join(", "))
+        console.log(
+          "[v0]   Tokens that couldn't be swapped:",
+          failedTokens.map((t) => `${t.symbol} (${t.reason})`).join(", "),
+        )
       }
 
       return {
