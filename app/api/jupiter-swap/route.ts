@@ -48,7 +48,6 @@ export async function POST(request: NextRequest) {
         userPublicKey: new PublicKey(userPublicKey),
         wrapAndUnwrapSol: true,
         dynamicComputeUnitLimit: true,
-        prioritizationFeeLamports: "auto",
       },
     })
 
