@@ -186,43 +186,85 @@ export class SolanaService {
     }
   }
 
-  private async tryJupiterSwapViaServer(
+  private async tryHybridJupiterSwap(
     inputMint: string,
     outputMint: string,
     amount: number,
     userPublicKey: string,
     slippageBps = 500,
   ): Promise<{ swapTransaction: string; outAmount: string } | null> {
+    // Passo 1: Obter quote diretamente do navegador via public.jupiterapi.com
+    let quote = null
+    const quoteUrl = `https://public.jupiterapi.com/quote?inputMint=${inputMint}&outputMint=${outputMint}&amount=${amount}&slippageBps=${slippageBps}`
+
     try {
-      // Usar a API route do servidor que faz quote + swap internamente
+      console.log("[v0] Fetching quote from public.jupiterapi.com...")
+      const quoteResponse = await fetch(quoteUrl, {
+        method: "GET",
+        headers: { Accept: "application/json" },
+      })
+
+      if (!quoteResponse.ok) {
+        console.log("[v0] Quote response not OK:", quoteResponse.status)
+        return null
+      }
+
+      const quoteText = await quoteResponse.text()
+
+      // Verificar se a resposta e JSON valido
+      if (quoteText.startsWith("<!") || quoteText.startsWith("<") || quoteText.startsWith("Invalid")) {
+        console.log("[v0] Quote response is not JSON:", quoteText.substring(0, 100))
+        return null
+      }
+
+      quote = JSON.parse(quoteText)
+
+      if (!quote || !quote.outAmount) {
+        console.log("[v0] Quote has no outAmount")
+        return null
+      }
+
+      if (quote.platformFee) {
+        delete quote.platformFee
+      }
+      if (quote.platformFeeBps !== undefined) {
+        delete quote.platformFeeBps
+      }
+
+      console.log("[v0] Quote received! outAmount:", quote.outAmount)
+    } catch (e: any) {
+      console.log("[v0] Quote fetch error:", e.message)
+      return null
+    }
+
+    // Passo 2: Enviar quote para API route gerar transacao de swap
+    try {
+      console.log("[v0] Sending quote to API route for swap transaction...")
       const apiResponse = await fetch("/api/jupiter-swap", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          inputMint,
-          outputMint,
-          amount,
+          quote,
           userPublicKey,
-          slippageBps,
         }),
       })
 
       if (!apiResponse.ok) {
         const errorData = await apiResponse.json().catch(() => ({}))
-        console.log("[v0] API route failed:", errorData.error || apiResponse.status)
+        console.log("[v0] API route swap failed:", errorData.error || apiResponse.status)
         return null
       }
 
       const data = await apiResponse.json()
 
-      if (data.swapTransaction && data.outAmount) {
-        console.log("[v0] Swap via server successful, outAmount:", data.outAmount)
-        return { swapTransaction: data.swapTransaction, outAmount: data.outAmount }
+      if (data.swapTransaction) {
+        console.log("[v0] Swap transaction generated successfully!")
+        return { swapTransaction: data.swapTransaction, outAmount: quote.outAmount }
       }
 
       return null
     } catch (e: any) {
-      console.log("[v0] Server swap error:", e.message)
+      console.log("[v0] API route error:", e.message)
       return null
     }
   }
@@ -265,7 +307,7 @@ export class SolanaService {
             continue
           }
 
-          const swapResult = await this.tryJupiterSwapViaServer(
+          const swapResult = await this.tryHybridJupiterSwap(
             token.mint,
             "So11111111111111111111111111111111111111112",
             inputAmount,

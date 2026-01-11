@@ -1,6 +1,6 @@
 "use client"
 
-const APP_VERSION = "1.6.0"
+const APP_VERSION = "1.6.2"
 const BUILD_DATE = "2026-01-11"
 
 export function VersionBadge() {
