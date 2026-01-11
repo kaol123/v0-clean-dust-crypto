@@ -186,6 +186,77 @@ export class SolanaService {
     }
   }
 
+  private async getQuoteWithRetry(
+    inputMint: string,
+    outputMint: string,
+    amount: number,
+    slippageBps: number,
+    maxRetries = 3,
+  ): Promise<any | null> {
+    const endpoints = [
+      "https://public.jupiterapi.com/quote",
+      "https://quote-api.jup.ag/v6/quote",
+      "https://api.jup.ag/swap/v1/quote",
+    ]
+
+    for (let retry = 0; retry < maxRetries; retry++) {
+      for (const endpoint of endpoints) {
+        try {
+          const quoteUrl = `${endpoint}?inputMint=${inputMint}&outputMint=${outputMint}&amount=${amount}&slippageBps=${slippageBps}`
+          console.log(`[v0] Trying quote from ${endpoint} (attempt ${retry + 1})...`)
+
+          const quoteResponse = await fetch(quoteUrl, {
+            method: "GET",
+            headers: { Accept: "application/json" },
+          })
+
+          if (quoteResponse.status === 429) {
+            console.log(`[v0] Rate limited on ${endpoint}, trying next...`)
+            await new Promise((resolve) => setTimeout(resolve, 500))
+            continue
+          }
+
+          if (!quoteResponse.ok) {
+            console.log(`[v0] Quote failed on ${endpoint}: ${quoteResponse.status}`)
+            continue
+          }
+
+          const quoteText = await quoteResponse.text()
+
+          if (quoteText.startsWith("<!") || quoteText.startsWith("<") || quoteText.includes("Invalid")) {
+            console.log(`[v0] Invalid response from ${endpoint}`)
+            continue
+          }
+
+          const quote = JSON.parse(quoteText)
+
+          if (!quote || !quote.outAmount) {
+            console.log(`[v0] No outAmount in quote from ${endpoint}`)
+            continue
+          }
+
+          // Remove platformFee fields to avoid feeAccount error
+          if (quote.platformFee) delete quote.platformFee
+          if (quote.platformFeeBps !== undefined) delete quote.platformFeeBps
+
+          console.log(`[v0] Quote received from ${endpoint}! outAmount: ${quote.outAmount}`)
+          return quote
+        } catch (e: any) {
+          console.log(`[v0] Error fetching quote from ${endpoint}: ${e.message}`)
+          continue
+        }
+      }
+
+      // Wait before next retry round
+      if (retry < maxRetries - 1) {
+        console.log(`[v0] All endpoints failed, waiting before retry ${retry + 2}...`)
+        await new Promise((resolve) => setTimeout(resolve, 1000))
+      }
+    }
+
+    return null
+  }
+
   private async tryHybridJupiterSwap(
     inputMint: string,
     outputMint: string,
@@ -193,47 +264,10 @@ export class SolanaService {
     userPublicKey: string,
     slippageBps = 500,
   ): Promise<{ swapTransaction: string; outAmount: string } | null> {
-    // Passo 1: Obter quote diretamente do navegador via public.jupiterapi.com
-    let quote = null
-    const quoteUrl = `https://public.jupiterapi.com/quote?inputMint=${inputMint}&outputMint=${outputMint}&amount=${amount}&slippageBps=${slippageBps}`
+    const quote = await this.getQuoteWithRetry(inputMint, outputMint, amount, slippageBps)
 
-    try {
-      console.log("[v0] Fetching quote from public.jupiterapi.com...")
-      const quoteResponse = await fetch(quoteUrl, {
-        method: "GET",
-        headers: { Accept: "application/json" },
-      })
-
-      if (!quoteResponse.ok) {
-        console.log("[v0] Quote response not OK:", quoteResponse.status)
-        return null
-      }
-
-      const quoteText = await quoteResponse.text()
-
-      // Verificar se a resposta e JSON valido
-      if (quoteText.startsWith("<!") || quoteText.startsWith("<") || quoteText.startsWith("Invalid")) {
-        console.log("[v0] Quote response is not JSON:", quoteText.substring(0, 100))
-        return null
-      }
-
-      quote = JSON.parse(quoteText)
-
-      if (!quote || !quote.outAmount) {
-        console.log("[v0] Quote has no outAmount")
-        return null
-      }
-
-      if (quote.platformFee) {
-        delete quote.platformFee
-      }
-      if (quote.platformFeeBps !== undefined) {
-        delete quote.platformFeeBps
-      }
-
-      console.log("[v0] Quote received! outAmount:", quote.outAmount)
-    } catch (e: any) {
-      console.log("[v0] Quote fetch error:", e.message)
+    if (!quote) {
+      console.log("[v0] All quote attempts failed")
       return null
     }
 
