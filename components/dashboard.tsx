@@ -18,12 +18,12 @@ export function Dashboard() {
   }
 
   return (
-    <section className="container mx-auto px-4 py-16">
-      <div className="mx-auto max-w-6xl space-y-8">
+    <section className="container mx-auto px-4 py-6">
+      <div className="mx-auto max-w-6xl space-y-4">
         <WalletConnect />
 
         {connected && publicKey && (
-          <div className="space-y-8">
+          <div className="space-y-4">
             <SessionTimer onTimeout={handleSessionTimeout} initialTime={120} />
             <CleanupSummary tokens={tokens} cleaning={cleaning} onCleanup={cleanupWallet} />
             <TokenList tokens={tokens} loading={loading} />
