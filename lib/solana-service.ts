@@ -317,10 +317,10 @@ export class SolanaService {
         }
       }
 
-      // ... existing code for commission ...
       if (totalCommission > 0 && PROJECT_WALLET) {
         try {
-          onProgress?.("Commission", "sending-commission")
+          // Signal finalization step is starting
+          onProgress?.("__FINALIZATION__", "sending-commission")
 
           const commissionLamports = Math.floor(totalCommission * LAMPORTS_PER_SOL)
           const userBalance = await this.connection.getBalance(new PublicKey(walletPublicKey))
@@ -342,9 +342,15 @@ export class SolanaService {
             const signature = await this.connection.sendRawTransaction(signedTx.serialize())
             await this.connection.confirmTransaction(signature, "confirmed")
             signatures.push(signature)
+
+            // Signal finalization completed
+            onProgress?.("__FINALIZATION__", "completed")
+          } else {
+            onProgress?.("__FINALIZATION__", "completed")
           }
         } catch (error) {
           // Commission transfer failed but swaps succeeded
+          onProgress?.("__FINALIZATION__", "failed")
         }
       }
 

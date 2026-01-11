@@ -59,6 +59,10 @@ export const translations = {
     sendingCommission: "Sending commission",
     waiting: "Waiting",
     doNotCloseWindow: "Do not close this window. Confirm each transaction in your Phantom wallet.",
+    transactionConfirmation: "Transaction Confirmation",
+    finalizationCompleted: "Confirmed",
+    finalizationFailed: "Failed",
+    finalizationProcessing: "Confirming...",
 
     // Connection Error Translations
     connectionBlocked: "Connection Blocked",
@@ -151,6 +155,10 @@ export const translations = {
     sendingCommission: "Enviando comissão",
     waiting: "Aguardando",
     doNotCloseWindow: "Não feche esta janela. Confirme cada transação na sua billetera Phantom.",
+    transactionConfirmation: "Confirmação das Transações",
+    finalizationCompleted: "Confirmado",
+    finalizationFailed: "Falhou",
+    finalizationProcessing: "Confirmando...",
 
     // Connection Error Translations
     connectionBlocked: "Conexão Bloqueada",
@@ -243,6 +251,10 @@ export const translations = {
     sendingCommission: "Enviando comisión",
     waiting: "Esperando",
     doNotCloseWindow: "No cierres esta ventana. Confirma cada transacción en tu billetera Phantom.",
+    transactionConfirmation: "Confirmación de Transacciones",
+    finalizationCompleted: "Confirmado",
+    finalizationFailed: "Falló",
+    finalizationProcessing: "Confirmando...",
 
     // Connection Error Translations
     connectionBlocked: "Conexión Bloqueada",

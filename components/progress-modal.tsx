@@ -2,13 +2,14 @@
 
 import { useEffect, useState } from "react"
 import { useLanguage } from "@/contexts/language-context"
-import { Loader2, Check, AlertCircle, Sparkles, ArrowRight, Wallet } from "lucide-react"
+import { Loader2, Check, AlertCircle, Sparkles, ArrowRight, Wallet, CheckCircle2 } from "lucide-react"
 
 export type SwapStep = {
   id: string
   tokenSymbol: string
   status: "pending" | "swapping" | "sending-commission" | "completed" | "failed"
   errorMessage?: string
+  isFinalization?: boolean
 }
 
 interface ProgressModalProps {
@@ -16,9 +17,18 @@ interface ProgressModalProps {
   steps: SwapStep[]
   currentTokenIndex: number
   totalTokens: number
+  showFinalization?: boolean
+  finalizationStatus?: "pending" | "processing" | "completed" | "failed"
 }
 
-export function ProgressModal({ isOpen, steps, currentTokenIndex, totalTokens }: ProgressModalProps) {
+export function ProgressModal({
+  isOpen,
+  steps,
+  currentTokenIndex,
+  totalTokens,
+  showFinalization = false,
+  finalizationStatus = "pending",
+}: ProgressModalProps) {
   const { t } = useLanguage()
   const [dots, setDots] = useState("")
 
@@ -35,7 +45,10 @@ export function ProgressModal({ isOpen, steps, currentTokenIndex, totalTokens }:
 
   const completedSteps = steps.filter((s) => s.status === "completed").length
   const failedSteps = steps.filter((s) => s.status === "failed").length
-  const progress = totalTokens > 0 ? ((completedSteps + failedSteps) / totalTokens) * 100 : 0
+
+  const totalSteps = showFinalization ? totalTokens + 1 : totalTokens
+  const completedTotal = completedSteps + failedSteps + (finalizationStatus === "completed" ? 1 : 0)
+  const progress = totalSteps > 0 ? (completedTotal / totalSteps) * 100 : 0
 
   const getStatusIcon = (status: SwapStep["status"]) => {
     switch (status) {
@@ -51,6 +64,19 @@ export function ProgressModal({ isOpen, steps, currentTokenIndex, totalTokens }:
     }
   }
 
+  const getFinalizationIcon = () => {
+    switch (finalizationStatus) {
+      case "completed":
+        return <Check className="h-5 w-5 text-green-400" />
+      case "failed":
+        return <AlertCircle className="h-5 w-5 text-red-400" />
+      case "processing":
+        return <Loader2 className="h-5 w-5 text-accent animate-spin" />
+      default:
+        return <div className="h-5 w-5 rounded-full border-2 border-muted-foreground/30" />
+    }
+  }
+
   const getStatusText = (step: SwapStep) => {
     switch (step.status) {
       case "completed":
@@ -61,6 +87,19 @@ export function ProgressModal({ isOpen, steps, currentTokenIndex, totalTokens }:
         return t.swappingToken || "Swapping"
       case "sending-commission":
         return t.sendingCommission || "Sending commission"
+      default:
+        return t.waiting || "Waiting"
+    }
+  }
+
+  const getFinalizationText = () => {
+    switch (finalizationStatus) {
+      case "completed":
+        return t.finalizationCompleted || "Confirmed"
+      case "failed":
+        return t.finalizationFailed || "Failed"
+      case "processing":
+        return t.finalizationProcessing || "Confirming..."
       default:
         return t.waiting || "Waiting"
     }
@@ -92,7 +131,7 @@ export function ProgressModal({ isOpen, steps, currentTokenIndex, totalTokens }:
           <div className="flex justify-between text-sm text-muted-foreground mb-2">
             <span>{t.progress || "Progress"}</span>
             <span>
-              {completedSteps + failedSteps} / {totalTokens}
+              {completedTotal} / {totalSteps}
             </span>
           </div>
           <div className="h-2 bg-muted rounded-full overflow-hidden">
@@ -136,6 +175,33 @@ export function ProgressModal({ isOpen, steps, currentTokenIndex, totalTokens }:
                 </div>
               </div>
             ))}
+
+            {showFinalization && (
+              <div
+                className={`flex items-center gap-3 p-3 rounded-lg transition-all ${
+                  finalizationStatus === "processing"
+                    ? "bg-accent/10 border border-accent/30"
+                    : finalizationStatus === "completed"
+                      ? "bg-green-500/10 border border-green-500/20"
+                      : finalizationStatus === "failed"
+                        ? "bg-red-500/10 border border-red-500/20"
+                        : "bg-muted/30"
+                }`}
+              >
+                {getFinalizationIcon()}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-accent flex-shrink-0" />
+                    <span className="font-medium">{t.transactionConfirmation || "Transaction Confirmation"}</span>
+                  </div>
+                  <p
+                    className={`text-xs ${finalizationStatus === "failed" ? "text-red-400" : "text-muted-foreground"}`}
+                  >
+                    {getFinalizationText()}
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 

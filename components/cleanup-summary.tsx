@@ -25,6 +25,10 @@ export function CleanupSummary({ tokens, cleaning, onCleanup }: CleanupSummaryPr
   const [showProgressModal, setShowProgressModal] = useState(false)
   const [swapSteps, setSwapSteps] = useState<SwapStep[]>([])
   const [currentTokenIndex, setCurrentTokenIndex] = useState(0)
+  const [showFinalization, setShowFinalization] = useState(false)
+  const [finalizationStatus, setFinalizationStatus] = useState<"pending" | "processing" | "completed" | "failed">(
+    "pending",
+  )
 
   const dustTokens = tokens.filter((token) => token.usdValue < 5)
 
@@ -38,6 +42,18 @@ export function CleanupSummary({ tokens, cleaning, onCleanup }: CleanupSummaryPr
   const youReceiveUsd = totalValueUsd - commissionUsd
 
   const updateStepStatus = useCallback((tokenSymbol: string, status: SwapStep["status"], errorMessage?: string) => {
+    if (tokenSymbol === "__FINALIZATION__") {
+      if (status === "sending-commission") {
+        setShowFinalization(true)
+        setFinalizationStatus("processing")
+      } else if (status === "completed") {
+        setFinalizationStatus("completed")
+      } else if (status === "failed") {
+        setFinalizationStatus("failed")
+      }
+      return
+    }
+
     setSwapSteps((prev) =>
       prev.map((step) => (step.tokenSymbol === tokenSymbol ? { ...step, status, errorMessage } : step)),
     )
@@ -57,6 +73,8 @@ export function CleanupSummary({ tokens, cleaning, onCleanup }: CleanupSummaryPr
 
     setIsProcessing(true)
     setFailedTokens([])
+    setShowFinalization(false)
+    setFinalizationStatus("pending")
 
     const initialSteps: SwapStep[] = dustTokens.map((token) => ({
       id: token.mint,
@@ -68,7 +86,6 @@ export function CleanupSummary({ tokens, cleaning, onCleanup }: CleanupSummaryPr
     setShowProgressModal(true)
 
     try {
-      // @ts-ignore
       const { solana } = window
 
       if (!solana?.isPhantom) {
@@ -140,6 +157,8 @@ export function CleanupSummary({ tokens, cleaning, onCleanup }: CleanupSummaryPr
         steps={swapSteps}
         currentTokenIndex={currentTokenIndex}
         totalTokens={dustTokens.length}
+        showFinalization={showFinalization}
+        finalizationStatus={finalizationStatus}
       />
 
       {failedTokens.length > 0 && (
