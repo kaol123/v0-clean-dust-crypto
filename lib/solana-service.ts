@@ -186,131 +186,45 @@ export class SolanaService {
     }
   }
 
-  private async tryJupiterSwapWithFee(
+  private async tryJupiterSwapViaServer(
     inputMint: string,
     outputMint: string,
     amount: number,
     userPublicKey: string,
-    expectedOutAmount: number,
     slippageBps = 500,
   ): Promise<{ swapTransaction: string; outAmount: string } | null> {
-    let quote = null
-
-    for (const endpoint of JUPITER_ENDPOINTS) {
-      try {
-        const quoteUrl = `${endpoint.quote}?inputMint=${inputMint}&outputMint=${outputMint}&amount=${amount}&slippageBps=${slippageBps}`
-
-        const quoteResponse = await fetch(quoteUrl, {
-          method: "GET",
-          headers: { Accept: "application/json" },
-        })
-
-        if (!quoteResponse.ok) {
-          continue
-        }
-
-        const quoteText = await quoteResponse.text()
-
-        if (quoteText.startsWith("Invalid") || quoteText.startsWith("<!") || quoteText.startsWith("<")) {
-          continue
-        }
-
-        quote = JSON.parse(quoteText)
-
-        if (quote && quote.outAmount) {
-          break
-        }
-      } catch (e: any) {
-        continue
-      }
-    }
-
-    if (!quote) {
-      return null
-    }
-
     try {
+      // Usar a API route do servidor que faz quote + swap internamente
       const apiResponse = await fetch("/api/jupiter-swap", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          quote,
+          inputMint,
+          outputMint,
+          amount,
           userPublicKey,
-          // Solicitar instruções para poder modificar a transação
-          asLegacyTransaction: false,
+          slippageBps,
         }),
       })
 
-      if (apiResponse.ok) {
-        const data = await apiResponse.json()
-        if (data.swapTransaction) {
-          return { swapTransaction: data.swapTransaction, outAmount: quote.outAmount }
-        }
+      if (!apiResponse.ok) {
+        const errorData = await apiResponse.json().catch(() => ({}))
+        console.log("[v0] API route failed:", errorData.error || apiResponse.status)
+        return null
       }
+
+      const data = await apiResponse.json()
+
+      if (data.swapTransaction && data.outAmount) {
+        console.log("[v0] Swap via server successful, outAmount:", data.outAmount)
+        return { swapTransaction: data.swapTransaction, outAmount: data.outAmount }
+      }
+
+      return null
     } catch (e: any) {
-      // Silent fail
+      console.log("[v0] Server swap error:", e.message)
+      return null
     }
-
-    return null
-  }
-
-  private async addFeeInstructionToTransaction(
-    swapTransactionBase64: string,
-    userPublicKey: string,
-    feeAmount: number,
-  ): Promise<VersionedTransaction> {
-    const swapTransactionBuf = Buffer.from(swapTransactionBase64, "base64")
-    const originalTransaction = VersionedTransaction.deserialize(swapTransactionBuf)
-
-    // Criar instrução de transferência de taxa
-    const feeInstruction = SystemProgram.transfer({
-      fromPubkey: new PublicKey(userPublicKey),
-      toPubkey: new PublicKey(PROJECT_WALLET),
-      lamports: Math.floor(feeAmount),
-    })
-
-    // Obter o blockhash mais recente
-    const { blockhash } = await this.connection.getLatestBlockhash()
-
-    // Decompor a mensagem original
-    const originalMessage = originalTransaction.message
-    const accountKeys = originalMessage.staticAccountKeys.map((key) => key)
-
-    // Verificar se PROJECT_WALLET já está nas account keys
-    const projectWalletPubkey = new PublicKey(PROJECT_WALLET)
-    let projectWalletIndex = accountKeys.findIndex((key) => key.equals(projectWalletPubkey))
-
-    if (projectWalletIndex === -1) {
-      // Adicionar PROJECT_WALLET às account keys
-      accountKeys.push(projectWalletPubkey)
-      projectWalletIndex = accountKeys.length - 1
-    }
-
-    // Encontrar o índice do userPublicKey
-    const userPubkey = new PublicKey(userPublicKey)
-    const userIndex = accountKeys.findIndex((key) => key.equals(userPubkey))
-
-    // Encontrar o índice do SystemProgram
-    const systemProgramPubkey = SystemProgram.programId
-    let systemProgramIndex = accountKeys.findIndex((key) => key.equals(systemProgramPubkey))
-
-    if (systemProgramIndex === -1) {
-      accountKeys.push(systemProgramPubkey)
-      systemProgramIndex = accountKeys.length - 1
-    }
-
-    // Criar uma nova transação legacy com a instrução de swap + taxa
-    const legacyTransaction = new Transaction()
-    legacyTransaction.recentBlockhash = blockhash
-    legacyTransaction.feePayer = userPubkey
-
-    // Adicionar instrução de taxa
-    legacyTransaction.add(feeInstruction)
-
-    // Converter para VersionedTransaction e combinar com a original
-    // Por simplicidade, vamos retornar a transação original e fazer a taxa separadamente
-    // mas marcando que a taxa foi calculada
-    return originalTransaction
   }
 
   async swapTokensToSol(
@@ -351,18 +265,17 @@ export class SolanaService {
             continue
           }
 
-          const swapResult = await this.tryJupiterSwapWithFee(
+          const swapResult = await this.tryJupiterSwapViaServer(
             token.mint,
             "So11111111111111111111111111111111111111112",
             inputAmount,
             walletPublicKey,
-            0,
             500,
           )
 
           if (!swapResult) {
             onProgress?.(token.symbol, "failed", "No liquidity")
-            failedTokens.push({ symbol: token.symbol, reason: "No liquidity or all endpoints failed" })
+            failedTokens.push({ symbol: token.symbol, reason: "No liquidity or swap failed" })
             continue
           }
 
@@ -373,7 +286,6 @@ export class SolanaService {
           const swapTransactionBuf = Buffer.from(swapTransaction, "base64")
           const transaction = VersionedTransaction.deserialize(swapTransactionBuf)
 
-          // Assinar e enviar swap
           const signedTx = await phantomWallet.signTransaction(transaction)
 
           const signature = await this.connection.sendRawTransaction(signedTx.serialize(), {
@@ -383,7 +295,6 @@ export class SolanaService {
 
           await this.connection.confirmTransaction(signature, "confirmed")
 
-          // Swap concluído, calcular comissão
           totalSolReceived += expectedSol
           totalCommission += tokenCommission
           signatures.push(signature)
@@ -400,17 +311,15 @@ export class SolanaService {
         }
       }
 
+      // ... existing code for commission ...
       if (totalCommission > 0 && PROJECT_WALLET) {
         try {
           onProgress?.("Commission", "sending-commission")
 
           const commissionLamports = Math.floor(totalCommission * LAMPORTS_PER_SOL)
-
-          // Verificar se o usuário tem saldo suficiente para a taxa
           const userBalance = await this.connection.getBalance(new PublicKey(walletPublicKey))
 
           if (userBalance >= commissionLamports + 5000) {
-            // 5000 lamports para gas
             const transaction = new Transaction().add(
               SystemProgram.transfer({
                 fromPubkey: new PublicKey(walletPublicKey),
@@ -424,15 +333,12 @@ export class SolanaService {
             transaction.feePayer = new PublicKey(walletPublicKey)
 
             const signedTx = await phantomWallet.signTransaction(transaction)
-
             const signature = await this.connection.sendRawTransaction(signedTx.serialize())
             await this.connection.confirmTransaction(signature, "confirmed")
-
             signatures.push(signature)
           }
         } catch (error) {
           // Commission transfer failed but swaps succeeded
-          // Não reportar erro ao usuário, apenas logar internamente
         }
       }
 

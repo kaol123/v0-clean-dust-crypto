@@ -1,18 +1,15 @@
 import { type NextRequest, NextResponse } from "next/server"
+import { createJupiterApiClient } from "@jup-ag/api"
 
-const JUPITER_SWAP_ENDPOINTS = [
-  "https://public.jupiterapi.com/swap",
-  "https://quote-api.jup.ag/v6/swap",
-  "https://api.jup.ag/swap/v1/swap",
-]
+const jupiterQuoteApi = createJupiterApiClient()
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
 
-    console.log("[v0] Jupiter API Route v1.0.8 - Hybrid mode")
+    console.log("[v0] Jupiter API Route v1.6.0 - Using @jup-ag/api library")
 
-    // Check if we received a pre-fetched quote
+    // Mode 1: Pre-fetched quote (hybrid mode)
     if (body.quote) {
       console.log("[v0] Received pre-fetched quote, generating swap transaction...")
       const { quote, userPublicKey } = body
@@ -21,130 +18,94 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: "Missing quote or userPublicKey" }, { status: 400 })
       }
 
-      console.log("[v0] Quote outAmount:", quote.outAmount)
+      try {
+        const swapResult = await jupiterQuoteApi.swapPost({
+          swapRequest: {
+            quoteResponse: quote,
+            userPublicKey: userPublicKey,
+            wrapAndUnwrapSol: true,
+            dynamicComputeUnitLimit: true,
+          },
+        })
 
-      // Try each swap endpoint
-      for (const swapEndpoint of JUPITER_SWAP_ENDPOINTS) {
-        try {
-          console.log("[v0] Trying swap endpoint:", swapEndpoint)
-
-          const swapResponse = await fetch(swapEndpoint, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Accept: "application/json",
-            },
-            body: JSON.stringify({
-              quoteResponse: quote,
-              userPublicKey: userPublicKey,
-              wrapAndUnwrapSol: true,
-              dynamicComputeUnitLimit: true,
-            }),
+        if (swapResult.swapTransaction) {
+          console.log("[v0] Swap transaction generated successfully")
+          return NextResponse.json({
+            success: true,
+            swapTransaction: swapResult.swapTransaction,
+            outAmount: quote.outAmount,
           })
-
-          console.log("[v0] Swap response status:", swapResponse.status)
-
-          if (!swapResponse.ok) {
-            const errorText = await swapResponse.text()
-            console.log("[v0] Swap failed:", errorText.substring(0, 200))
-            continue
-          }
-
-          const swapText = await swapResponse.text()
-
-          // Check if response is valid JSON
-          if (swapText.startsWith("Invalid") || swapText.startsWith("<!")) {
-            console.log("[v0] Invalid swap response:", swapText.substring(0, 100))
-            continue
-          }
-
-          const swapResult = JSON.parse(swapText)
-
-          if (swapResult.swapTransaction) {
-            console.log("[v0] ✅ Swap transaction generated from:", swapEndpoint)
-            return NextResponse.json({
-              success: true,
-              swapTransaction: swapResult.swapTransaction,
-              outAmount: quote.outAmount,
-            })
-          }
-        } catch (e: any) {
-          console.log("[v0] Swap endpoint", swapEndpoint, "failed:", e.message)
-          continue
         }
+      } catch (e: any) {
+        console.log("[v0] Swap generation failed:", e.message)
+        return NextResponse.json({ error: e.message }, { status: 400 })
       }
 
-      return NextResponse.json({ error: "All swap endpoints failed", noLiquidity: false }, { status: 400 })
+      return NextResponse.json({ error: "Failed to generate swap" }, { status: 400 })
     }
 
-    // Legacy mode: full quote + swap (for backward compatibility)
+    // Mode 2: Full quote + swap (legacy mode - this is what we need!)
     const { inputMint, outputMint, amount, userPublicKey, slippageBps = 500 } = body
 
-    console.log("[v0] Legacy mode - full quote + swap")
+    console.log("[v0] Full mode - quote + swap via @jup-ag/api")
+    console.log("[v0] Input:", inputMint, "Amount:", amount)
 
     if (!inputMint || !outputMint || !amount || !userPublicKey) {
       return NextResponse.json({ error: "Missing required parameters" }, { status: 400 })
     }
 
-    // Get quote
-    const quoteUrl = `https://public.jupiterapi.com/quote?inputMint=${inputMint}&outputMint=${outputMint}&amount=${amount}&slippageBps=${slippageBps}`
-    console.log("[v0] Fetching quote from:", quoteUrl)
+    // Get quote using the library
+    let quote
+    try {
+      quote = await jupiterQuoteApi.quoteGet({
+        inputMint,
+        outputMint,
+        amount,
+        slippageBps,
+      })
 
-    const quoteResponse = await fetch(quoteUrl, {
-      method: "GET",
-      headers: { Accept: "application/json" },
-    })
+      if (!quote || !quote.outAmount) {
+        console.log("[v0] No quote available - token may not have liquidity")
+        return NextResponse.json({ error: "No liquidity for this token", noLiquidity: true }, { status: 400 })
+      }
 
-    if (!quoteResponse.ok) {
-      const errorText = await quoteResponse.text()
-      console.log("[v0] Quote failed:", errorText)
-      return NextResponse.json({ error: errorText, noLiquidity: true }, { status: 400 })
+      console.log("[v0] Quote received! Output amount:", quote.outAmount)
+    } catch (e: any) {
+      console.log("[v0] Quote error:", e.message)
+
+      if (e.message?.includes("TOKEN_NOT_TRADABLE") || e.message?.includes("No route found")) {
+        return NextResponse.json({ error: "Token not tradable", noLiquidity: true }, { status: 400 })
+      }
+
+      return NextResponse.json({ error: e.message, noLiquidity: true }, { status: 400 })
     }
 
-    const quoteText = await quoteResponse.text()
+    // Get swap transaction using the library
+    try {
+      const swapResult = await jupiterQuoteApi.swapPost({
+        swapRequest: {
+          quoteResponse: quote,
+          userPublicKey,
+          wrapAndUnwrapSol: true,
+          dynamicComputeUnitLimit: true,
+        },
+      })
 
-    if (quoteText.startsWith("Invalid") || quoteText.startsWith("<!")) {
-      return NextResponse.json({ error: "Invalid quote response", noLiquidity: true }, { status: 400 })
+      if (!swapResult.swapTransaction) {
+        return NextResponse.json({ error: "Failed to generate swap transaction" }, { status: 400 })
+      }
+
+      console.log("[v0] Swap transaction generated successfully!")
+
+      return NextResponse.json({
+        success: true,
+        swapTransaction: swapResult.swapTransaction,
+        outAmount: quote.outAmount,
+      })
+    } catch (e: any) {
+      console.error("[v0] Swap error:", e.message)
+      return NextResponse.json({ error: e.message }, { status: 500 })
     }
-
-    const quote = JSON.parse(quoteText)
-
-    if (!quote || !quote.outAmount) {
-      return NextResponse.json({ error: "No liquidity", noLiquidity: true }, { status: 400 })
-    }
-
-    console.log("[v0] Quote received! Output:", quote.outAmount)
-
-    // Get swap
-    const swapResponse = await fetch("https://public.jupiterapi.com/swap", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        quoteResponse: quote,
-        userPublicKey,
-        wrapAndUnwrapSol: true,
-        dynamicComputeUnitLimit: true,
-      }),
-    })
-
-    if (!swapResponse.ok) {
-      const errorText = await swapResponse.text()
-      return NextResponse.json({ error: errorText }, { status: 400 })
-    }
-
-    const swapResult = await swapResponse.json()
-
-    if (!swapResult.swapTransaction) {
-      return NextResponse.json({ error: "Failed to generate swap" }, { status: 400 })
-    }
-
-    console.log("[v0] ✅ Swap transaction generated!")
-
-    return NextResponse.json({
-      success: true,
-      swapTransaction: swapResult.swapTransaction,
-      outAmount: quote.outAmount,
-    })
   } catch (error: any) {
     console.error("[v0] Jupiter API Route exception:", error.message)
     return NextResponse.json({ error: error.message }, { status: 500 })
