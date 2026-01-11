@@ -5,9 +5,10 @@ import { Button } from "@/components/ui/button"
 import { Sparkles, TrendingUp, Percent, AlertCircle } from "lucide-react"
 import type { Token } from "@/types/token"
 import { useLanguage } from "@/contexts/language-context"
-import { useState } from "react"
+import { useState, useCallback } from "react"
 import { useToast } from "@/hooks/use-toast"
 import { SolanaService } from "@/lib/solana-service"
+import { ProgressModal, type SwapStep } from "@/components/progress-modal"
 
 interface CleanupSummaryProps {
   tokens: Token[]
@@ -21,6 +22,10 @@ export function CleanupSummary({ tokens, cleaning, onCleanup }: CleanupSummaryPr
   const [isProcessing, setIsProcessing] = useState(false)
   const [failedTokens, setFailedTokens] = useState<{ symbol: string; reason: string }[]>([])
 
+  const [showProgressModal, setShowProgressModal] = useState(false)
+  const [swapSteps, setSwapSteps] = useState<SwapStep[]>([])
+  const [currentTokenIndex, setCurrentTokenIndex] = useState(0)
+
   const dustTokens = tokens.filter((token) => token.usdValue < 5)
 
   const totalValueSol = dustTokens.reduce((sum, token) => sum + token.solValue, 0)
@@ -32,19 +37,16 @@ export function CleanupSummary({ tokens, cleaning, onCleanup }: CleanupSummaryPr
   const youReceiveSol = totalValueSol - commissionSol
   const youReceiveUsd = totalValueUsd - commissionUsd
 
-  const handleCleanupDirect = async () => {
-    console.log("[v0] ========== DIRECT CLEANUP CLICKED ==========")
-    console.log("[v0] Window location:", window.location.href)
-    console.log("[v0] Dust tokens:", dustTokens.length)
-    console.log("[v0] Tokens passed to component:", tokens.length)
-    console.log("[v0] window.solana exists:", "solana" in window)
-    // @ts-ignore
-    console.log("[v0] window.solana.isPhantom:", window.solana?.isPhantom)
-    // @ts-ignore
-    console.log("[v0] window.solana.isConnected:", window.solana?.isConnected)
-    // @ts-ignore
-    console.log("[v0] window.solana.publicKey:", window.solana?.publicKey?.toString())
+  const updateStepStatus = useCallback((tokenSymbol: string, status: SwapStep["status"], errorMessage?: string) => {
+    setSwapSteps((prev) =>
+      prev.map((step) => (step.tokenSymbol === tokenSymbol ? { ...step, status, errorMessage } : step)),
+    )
+    if (status === "completed" || status === "failed") {
+      setCurrentTokenIndex((prev) => prev + 1)
+    }
+  }, [])
 
+  const handleCleanupDirect = async () => {
     if (dustTokens.length === 0) {
       toast({
         title: "No Dust Tokens",
@@ -56,48 +58,36 @@ export function CleanupSummary({ tokens, cleaning, onCleanup }: CleanupSummaryPr
     setIsProcessing(true)
     setFailedTokens([])
 
+    const initialSteps: SwapStep[] = dustTokens.map((token) => ({
+      id: token.mint,
+      tokenSymbol: token.symbol,
+      status: "pending",
+    }))
+    setSwapSteps(initialSteps)
+    setCurrentTokenIndex(0)
+    setShowProgressModal(true)
+
     try {
       // @ts-ignore
       const { solana } = window
 
-      console.log("[v0] Got window.solana reference")
-
       if (!solana?.isPhantom) {
-        console.error("[v0] ❌ Phantom not detected!")
         throw new Error("Phantom wallet not found. Please install Phantom.")
       }
 
-      console.log("[v0] ✅ Phantom detected")
-
       if (!solana.isConnected) {
-        console.log("[v0] Wallet not connected, connecting...")
         await solana.connect()
-        console.log("[v0] ✅ Connected")
-      } else {
-        console.log("[v0] ✅ Wallet already connected")
       }
 
       const publicKey = solana.publicKey?.toString()
-      console.log("[v0] Public key:", publicKey)
 
       if (!publicKey) {
-        console.error("[v0] ❌ Could not get public key!")
         throw new Error("Could not get wallet public key")
       }
 
-      console.log("[v0] ✅ Connected wallet:", publicKey)
-      console.log("[v0] Starting swap for", dustTokens.length, "tokens...")
-
       const solanaService = new SolanaService()
 
-      console.log("[v0] Calling swapTokensToSol...")
-      const result = await solanaService.swapTokensToSol(dustTokens, publicKey, solana)
-
-      console.log("[v0] ✅ Swap completed!")
-      console.log("[v0] Total received:", result.totalSol, "SOL")
-      console.log("[v0] Commission:", result.commission, "SOL")
-      console.log("[v0] User receives:", result.userReceives, "SOL")
-      console.log("[v0] Failed tokens:", result.failedTokens.length)
+      const result = await solanaService.swapTokensToSol(dustTokens, publicKey, solana, updateStepStatus)
 
       const successfulSwaps = dustTokens.length - result.failedTokens.length
 
@@ -118,14 +108,8 @@ export function CleanupSummary({ tokens, cleaning, onCleanup }: CleanupSummaryPr
         })
       }
 
-      console.log("[v0] Calling onCleanup callback...")
       onCleanup()
-      console.log("[v0] ========== CLEANUP PROCESS COMPLETE ==========")
     } catch (error: any) {
-      console.error("[v0] ❌ Direct cleanup failed:", error)
-      console.error("[v0] Error name:", error.name)
-      console.error("[v0] Error message:", error.message)
-      console.error("[v0] Error stack:", error.stack)
       toast({
         title: "Cleanup Failed",
         description: error.message || "Could not complete cleanup",
@@ -133,18 +117,11 @@ export function CleanupSummary({ tokens, cleaning, onCleanup }: CleanupSummaryPr
       })
     } finally {
       setIsProcessing(false)
-      console.log("[v0] isProcessing set to false")
+      setTimeout(() => setShowProgressModal(false), 2000)
     }
   }
 
   const isLoading = cleaning || isProcessing
-
-  console.log("[v0] ========== CLEANUP SUMMARY RENDER ==========")
-  console.log("[v0] Total tokens received:", tokens.length)
-  console.log("[v0] Dust tokens (< $5):", dustTokens.length)
-  console.log("[v0] Is loading:", isLoading)
-  console.log("[v0] Button will be rendered:", dustTokens.length > 0)
-  console.log("[v0] ===============================================")
 
   if (dustTokens.length === 0) {
     return (
@@ -158,6 +135,13 @@ export function CleanupSummary({ tokens, cleaning, onCleanup }: CleanupSummaryPr
 
   return (
     <div className="space-y-4">
+      <ProgressModal
+        isOpen={showProgressModal}
+        steps={swapSteps}
+        currentTokenIndex={currentTokenIndex}
+        totalTokens={dustTokens.length}
+      />
+
       {failedTokens.length > 0 && (
         <div className="relative overflow-hidden rounded-xl border border-amber-500/30 bg-gradient-to-r from-amber-500/10 via-orange-500/10 to-amber-500/10 p-4">
           <div className="absolute inset-0 bg-gradient-to-r from-amber-500/5 to-orange-500/5 animate-pulse" />
@@ -224,10 +208,7 @@ export function CleanupSummary({ tokens, cleaning, onCleanup }: CleanupSummaryPr
         </div>
 
         <Button
-          onClick={() => {
-            console.log("[v0] BUTTON ONCLICK FIRED!!!")
-            handleCleanupDirect()
-          }}
+          onClick={handleCleanupDirect}
           disabled={isLoading}
           size="lg"
           className="w-full gap-2 bg-gradient-to-r from-primary to-accent text-lg font-semibold hover:opacity-90 transition-opacity"

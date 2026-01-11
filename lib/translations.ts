@@ -41,6 +41,17 @@ export const translations = {
     insufficientLiquidity:
       "These tokens may have insufficient liquidity. Try swapping them directly in your Phantom wallet.",
 
+    // Progress Modal
+    processingSwaps: "Processing Swaps",
+    pleaseConfirmTransactions: "Please confirm all transactions in your wallet",
+    progress: "Progress",
+    swapCompleted: "Completed",
+    swapFailed: "Failed",
+    swappingToken: "Swapping token",
+    sendingCommission: "Sending commission",
+    waiting: "Waiting",
+    doNotCloseWindow: "Do not close this window. Confirm each transaction in your Phantom wallet.",
+
     refresh: "Refresh",
   },
   pt: {
@@ -83,6 +94,17 @@ export const translations = {
     insufficientLiquidity:
       "Estes tokens podem não ter liquidez suficiente. Tente trocá-los diretamente na sua carteira Phantom.",
 
+    // Progress Modal
+    processingSwaps: "Processando Swaps",
+    pleaseConfirmTransactions: "Por favor, confirme todas as transações na sua carteira",
+    progress: "Progresso",
+    swapCompleted: "Concluído",
+    swapFailed: "Falhou",
+    swappingToken: "Trocando token",
+    sendingCommission: "Enviando comissão",
+    waiting: "Aguardando",
+    doNotCloseWindow: "Não feche esta janela. Confirme cada transação na sua carteira Phantom.",
+
     refresh: "Atualizar",
   },
   es: {
@@ -124,6 +146,17 @@ export const translations = {
     tokensCouldNotBeSwappedPlural: "tokens no pudieron ser intercambiados",
     insufficientLiquidity:
       "Estos tokens pueden no tener suficiente liquidez. Intenta intercambiarlos directamente en tu billetera Phantom.",
+
+    // Progress Modal
+    processingSwaps: "Procesando Swaps",
+    pleaseConfirmTransactions: "Por favor, confirma todas las transacciones en tu billetera",
+    progress: "Progreso",
+    swapCompleted: "Completado",
+    swapFailed: "Falló",
+    swappingToken: "Intercambiando token",
+    sendingCommission: "Enviando comisión",
+    waiting: "Esperando",
+    doNotCloseWindow: "No cierres esta ventana. Confirma cada transacción en tu billetera Phantom.",
 
     refresh: "Actualizar",
   },
