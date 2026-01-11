@@ -7,7 +7,6 @@ import {
   LAMPORTS_PER_SOL,
 } from "@solana/web3.js"
 import type { Token } from "@/types/token"
-import { createJupiterApiClient } from "@jup-ag/api"
 
 const PROJECT_WALLET = process.env.NEXT_PUBLIC_PROJECT_WALLET || ""
 
@@ -15,59 +14,22 @@ if (!PROJECT_WALLET) {
   console.warn("[v0] PROJECT_WALLET not configured. Please set NEXT_PUBLIC_PROJECT_WALLET in .env.local")
 }
 
-// Solana RPC endpoint
 const RPC_ENDPOINT = process.env.NEXT_PUBLIC_SOLANA_RPC || "https://api.mainnet-beta.solana.com"
 
-let tokenListCache: Map<string, { symbol: string; name: string; logoURI?: string }> | null = null
+const JUPITER_ENDPOINTS = [
+  { quote: "https://api.jup.ag/swap/v1/quote", swap: "https://api.jup.ag/swap/v1/swap" },
+  { quote: "https://quote-api.jup.ag/v6/quote", swap: "https://quote-api.jup.ag/v6/swap" },
+  { quote: "https://public.jupiterapi.com/quote", swap: "https://public.jupiterapi.com/swap" },
+]
 
 export class SolanaService {
   private connection: Connection
-  private jupiterClient: ReturnType<typeof createJupiterApiClient> | null = null
 
   constructor() {
     this.connection = new Connection(RPC_ENDPOINT, "confirmed")
   }
 
-  private getJupiterClient() {
-    if (!this.jupiterClient && typeof window !== "undefined") {
-      this.jupiterClient = createJupiterApiClient()
-    }
-    return this.jupiterClient
-  }
-
-  private async loadTokenList() {
-    if (tokenListCache) return tokenListCache
-
-    try {
-      console.log("[v0] Loading token metadata from Jupiter...")
-      const response = await fetch("/api/token-list")
-
-      if (!response.ok) {
-        console.error("[v0] Token list API returned error:", response.status)
-        return new Map()
-      }
-
-      const tokens = await response.json()
-
-      tokenListCache = new Map()
-      for (const token of tokens) {
-        tokenListCache.set(token.address, {
-          symbol: token.symbol,
-          name: token.name,
-          logoURI: token.logoURI,
-        })
-      }
-
-      console.log("[v0] Loaded metadata for", tokenListCache.size, "tokens from Jupiter")
-      return tokenListCache
-    } catch (error) {
-      console.error("[v0] Error loading token list:", error)
-      return new Map()
-    }
-  }
-
   private async getTokenMetadata(mint: string): Promise<{ symbol: string; name: string; logoURI?: string }> {
-    // Fallback to DexScreener API for token info
     try {
       console.log("[v0] Fetching metadata from DexScreener for", mint.slice(0, 6))
       const response = await fetch(`https://api.dexscreener.com/latest/dex/tokens/${mint}`)
@@ -88,7 +50,6 @@ export class SolanaService {
       console.log("[v0] DexScreener lookup failed for", mint.slice(0, 6))
     }
 
-    // Last resort: use shortened mint address
     console.log("[v0] No metadata found for", mint.slice(0, 6), "- using fallback")
     return {
       symbol: mint.slice(0, 4).toUpperCase(),
@@ -109,7 +70,6 @@ export class SolanaService {
           const data = await response.json()
 
           if (data.pairs && data.pairs.length > 0) {
-            // Find the most liquid pair
             const sortedPairs = data.pairs.sort((a: any, b: any) => (b.liquidity?.usd || 0) - (a.liquidity?.usd || 0))
             const bestPair = sortedPairs[0]
             const price = Number.parseFloat(bestPair.priceUsd || 0)
@@ -121,7 +81,6 @@ export class SolanaService {
             priceMap.set(mint, 0)
           }
 
-          // Rate limiting - wait 100ms between requests
           await new Promise((resolve) => setTimeout(resolve, 100))
         } catch (error) {
           console.error("[v0] Error fetching price for", mint.slice(0, 6), error)
@@ -150,14 +109,13 @@ export class SolanaService {
         return price
       }
 
-      return 180 // Fallback price
+      return 180
     } catch (error) {
       console.error("[v0] Error fetching SOL price:", error)
       return 180
     }
   }
 
-  // Fetch all token accounts for a wallet
   async getTokenAccounts(walletAddress: string): Promise<Token[]> {
     try {
       const publicKey = new PublicKey(walletAddress)
@@ -168,7 +126,6 @@ export class SolanaService {
       const solPrice = await this.getSolPrice()
       console.log("[v0] Current SOL price:", solPrice, "USD")
 
-      // Get all token accounts
       const tokenAccounts = await this.connection.getParsedTokenAccountsByOwner(publicKey, {
         programId: new PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"),
       })
@@ -195,7 +152,6 @@ export class SolanaService {
 
       console.log("[v0] Accounts with balance:", accountsWithBalance.length)
 
-      // Batch fetch all prices at once
       console.log("[v0] Fetching prices for all tokens...")
       const priceMap = await this.getTokenPrices(mints)
       console.log("[v0] Price map size:", priceMap.size)
@@ -254,6 +210,113 @@ export class SolanaService {
     }
   }
 
+  private async tryJupiterSwap(
+    inputMint: string,
+    outputMint: string,
+    amount: number,
+    userPublicKey: string,
+    slippageBps = 500,
+  ): Promise<{ swapTransaction: string; outAmount: string } | null> {
+    // First try API route
+    try {
+      console.log("[v0] Trying Jupiter via API route...")
+      const apiResponse = await fetch("/api/jupiter-swap", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          inputMint,
+          outputMint,
+          amount: amount.toString(),
+          userPublicKey,
+          slippageBps,
+        }),
+      })
+
+      if (apiResponse.ok) {
+        const data = await apiResponse.json()
+        if (data.swapTransaction) {
+          console.log("[v0] ✅ Got swap transaction from API route")
+          return { swapTransaction: data.swapTransaction, outAmount: data.outAmount }
+        }
+      }
+      console.log("[v0] API route failed with status:", apiResponse.status)
+    } catch (e: any) {
+      console.log("[v0] API route exception:", e.message)
+    }
+
+    // Try each Jupiter endpoint directly from browser
+    for (const endpoint of JUPITER_ENDPOINTS) {
+      try {
+        console.log("[v0] Trying Jupiter endpoint:", endpoint.quote)
+
+        // Get quote
+        const quoteUrl = `${endpoint.quote}?inputMint=${inputMint}&outputMint=${outputMint}&amount=${amount}&slippageBps=${slippageBps}`
+
+        const quoteResponse = await fetch(quoteUrl, {
+          method: "GET",
+          headers: {
+            Accept: "application/json",
+          },
+        })
+
+        if (!quoteResponse.ok) {
+          console.log("[v0] Quote failed for endpoint:", endpoint.quote, "status:", quoteResponse.status)
+          continue
+        }
+
+        const quoteText = await quoteResponse.text()
+
+        // Check if response is valid JSON
+        if (quoteText.startsWith("Invalid") || quoteText.startsWith("<!") || quoteText.startsWith("<")) {
+          console.log("[v0] Invalid response from:", endpoint.quote)
+          continue
+        }
+
+        const quote = JSON.parse(quoteText)
+
+        if (!quote || !quote.outAmount) {
+          console.log("[v0] No valid quote from:", endpoint.quote)
+          continue
+        }
+
+        console.log("[v0] ✅ Quote received from", endpoint.quote, "- Output:", quote.outAmount)
+
+        // Get swap transaction
+        const swapResponse = await fetch(endpoint.swap, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          },
+          body: JSON.stringify({
+            quoteResponse: quote,
+            userPublicKey,
+            wrapAndUnwrapSol: true,
+            dynamicComputeUnitLimit: true,
+            dynamicSlippage: true,
+          }),
+        })
+
+        if (!swapResponse.ok) {
+          console.log("[v0] Swap request failed for endpoint:", endpoint.swap)
+          continue
+        }
+
+        const swapData = await swapResponse.json()
+
+        if (swapData.swapTransaction) {
+          console.log("[v0] ✅ Got swap transaction from:", endpoint.swap)
+          return { swapTransaction: swapData.swapTransaction, outAmount: quote.outAmount }
+        }
+      } catch (e: any) {
+        console.log("[v0] Endpoint", endpoint.quote, "failed:", e.message)
+        continue
+      }
+    }
+
+    return null
+  }
+
   async swapTokensToSol(
     tokens: Token[],
     walletPublicKey: string,
@@ -300,99 +363,21 @@ export class SolanaService {
             continue
           }
 
-          let swapTransaction: string | null = null
-          let outAmount = "0"
+          const swapResult = await this.tryJupiterSwap(
+            token.mint,
+            "So11111111111111111111111111111111111111112",
+            inputAmount,
+            walletPublicKey,
+            500,
+          )
 
-          try {
-            console.log("[v0] Trying Jupiter via API route...")
-            const apiResponse = await fetch("/api/jupiter-swap", {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify({
-                inputMint: token.mint,
-                outputMint: "So11111111111111111111111111111111111111112",
-                amount: inputAmount.toString(),
-                userPublicKey: walletPublicKey,
-                slippageBps: 500,
-              }),
-            })
-
-            if (apiResponse.ok) {
-              const data = await apiResponse.json()
-              swapTransaction = data.swapTransaction
-              outAmount = data.outAmount
-              console.log("[v0] ✅ Got swap transaction from API route")
-            } else {
-              console.log("[v0] API route failed, trying direct Jupiter client...")
-              throw new Error("API route failed")
-            }
-          } catch (apiError) {
-            console.log("[v0] Using Jupiter client directly in browser...")
-            const jupiterClient = this.getJupiterClient()
-
-            if (!jupiterClient) {
-              throw new Error("Jupiter client not available")
-            }
-
-            try {
-              // Get quote
-              console.log("[v0] Getting quote from Jupiter...")
-              const quote = await jupiterClient.quoteGet({
-                inputMint: token.mint,
-                outputMint: "So11111111111111111111111111111111111111112",
-                amount: inputAmount,
-                slippageBps: 500,
-              })
-
-              if (!quote) {
-                throw new Error("No quote received")
-              }
-
-              console.log("[v0] Quote received! Output amount:", quote.outAmount)
-              outAmount = quote.outAmount
-
-              // Get swap transaction
-              console.log("[v0] Getting swap transaction...")
-              const swapResult = await jupiterClient.swapPost({
-                swapRequest: {
-                  quoteResponse: quote,
-                  userPublicKey: walletPublicKey,
-                  wrapAndUnwrapSol: true,
-                  dynamicComputeUnitLimit: true,
-                  dynamicSlippage: true,
-                },
-              })
-
-              if (!swapResult?.swapTransaction) {
-                throw new Error("No swap transaction in response")
-              }
-
-              swapTransaction = swapResult.swapTransaction
-              console.log("[v0] ✅ Got swap transaction from direct Jupiter client")
-            } catch (jupiterError: any) {
-              console.log("[v0] Jupiter client error:", jupiterError.message)
-
-              // Check for specific error types
-              if (
-                jupiterError.message?.includes("TOKEN_NOT_TRADABLE") ||
-                jupiterError.message?.includes("No quote") ||
-                jupiterError.message?.includes("No route found")
-              ) {
-                failedTokens.push({ symbol: token.symbol, reason: "No liquidity available" })
-              } else {
-                failedTokens.push({ symbol: token.symbol, reason: jupiterError.message || "Swap failed" })
-              }
-              continue
-            }
-          }
-
-          if (!swapTransaction) {
-            failedTokens.push({ symbol: token.symbol, reason: "No swap transaction generated" })
+          if (!swapResult) {
+            console.log("[v0] ❌ All Jupiter endpoints failed for", token.symbol)
+            failedTokens.push({ symbol: token.symbol, reason: "No liquidity or all endpoints failed" })
             continue
           }
 
+          const { swapTransaction, outAmount } = swapResult
           const expectedSol = Number(outAmount) / LAMPORTS_PER_SOL
           console.log("[v0] Expected SOL output:", expectedSol)
 
@@ -427,7 +412,6 @@ export class SolanaService {
         }
       }
 
-      // ... existing code for commission transfer ...
       console.log("[v0] ========================================")
       console.log("[v0] Swap phase completed!")
       console.log("[v0] Total SOL received from swaps:", totalSolReceived)
