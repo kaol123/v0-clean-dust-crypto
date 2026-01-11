@@ -7,6 +7,7 @@ import {
   LAMPORTS_PER_SOL,
 } from "@solana/web3.js"
 import type { Token } from "@/types/token"
+import { createJupiterApiClient } from "@jup-ag/api"
 
 const PROJECT_WALLET = process.env.NEXT_PUBLIC_PROJECT_WALLET || ""
 
@@ -16,15 +17,22 @@ if (!PROJECT_WALLET) {
 
 // Solana RPC endpoint
 const RPC_ENDPOINT = process.env.NEXT_PUBLIC_SOLANA_RPC || "https://api.mainnet-beta.solana.com"
-const JUPITER_QUOTE_API = "https://quote-api.jup.ag/v6"
 
 let tokenListCache: Map<string, { symbol: string; name: string; logoURI?: string }> | null = null
 
 export class SolanaService {
   private connection: Connection
+  private jupiterClient: ReturnType<typeof createJupiterApiClient> | null = null
 
   constructor() {
     this.connection = new Connection(RPC_ENDPOINT, "confirmed")
+  }
+
+  private getJupiterClient() {
+    if (!this.jupiterClient && typeof window !== "undefined") {
+      this.jupiterClient = createJupiterApiClient()
+    }
+    return this.jupiterClient
   }
 
   private async loadTokenList() {
@@ -292,34 +300,98 @@ export class SolanaService {
             continue
           }
 
-          console.log("[v0] Calling Jupiter via API route...")
+          let swapTransaction: string | null = null
+          let outAmount = "0"
 
-          const apiResponse = await fetch("/api/jupiter-swap", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              inputMint: token.mint,
-              outputMint: "So11111111111111111111111111111111111111112",
-              amount: inputAmount.toString(),
-              userPublicKey: walletPublicKey,
-              slippageBps: 500,
-            }),
-          })
-
-          if (!apiResponse.ok) {
-            const errorData = await apiResponse.json().catch(() => ({ error: "Unknown error" }))
-            console.log("[v0] ❌ Jupiter API route failed for", token.symbol, ":", errorData.error)
-            failedTokens.push({
-              symbol: token.symbol,
-              reason: errorData.noLiquidity ? "No liquidity available" : "Swap failed",
+          try {
+            console.log("[v0] Trying Jupiter via API route...")
+            const apiResponse = await fetch("/api/jupiter-swap", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                inputMint: token.mint,
+                outputMint: "So11111111111111111111111111111111111111112",
+                amount: inputAmount.toString(),
+                userPublicKey: walletPublicKey,
+                slippageBps: 500,
+              }),
             })
-            continue
+
+            if (apiResponse.ok) {
+              const data = await apiResponse.json()
+              swapTransaction = data.swapTransaction
+              outAmount = data.outAmount
+              console.log("[v0] ✅ Got swap transaction from API route")
+            } else {
+              console.log("[v0] API route failed, trying direct Jupiter client...")
+              throw new Error("API route failed")
+            }
+          } catch (apiError) {
+            console.log("[v0] Using Jupiter client directly in browser...")
+            const jupiterClient = this.getJupiterClient()
+
+            if (!jupiterClient) {
+              throw new Error("Jupiter client not available")
+            }
+
+            try {
+              // Get quote
+              console.log("[v0] Getting quote from Jupiter...")
+              const quote = await jupiterClient.quoteGet({
+                inputMint: token.mint,
+                outputMint: "So11111111111111111111111111111111111111112",
+                amount: inputAmount,
+                slippageBps: 500,
+              })
+
+              if (!quote) {
+                throw new Error("No quote received")
+              }
+
+              console.log("[v0] Quote received! Output amount:", quote.outAmount)
+              outAmount = quote.outAmount
+
+              // Get swap transaction
+              console.log("[v0] Getting swap transaction...")
+              const swapResult = await jupiterClient.swapPost({
+                swapRequest: {
+                  quoteResponse: quote,
+                  userPublicKey: walletPublicKey,
+                  wrapAndUnwrapSol: true,
+                  dynamicComputeUnitLimit: true,
+                  dynamicSlippage: true,
+                },
+              })
+
+              if (!swapResult?.swapTransaction) {
+                throw new Error("No swap transaction in response")
+              }
+
+              swapTransaction = swapResult.swapTransaction
+              console.log("[v0] ✅ Got swap transaction from direct Jupiter client")
+            } catch (jupiterError: any) {
+              console.log("[v0] Jupiter client error:", jupiterError.message)
+
+              // Check for specific error types
+              if (
+                jupiterError.message?.includes("TOKEN_NOT_TRADABLE") ||
+                jupiterError.message?.includes("No quote") ||
+                jupiterError.message?.includes("No route found")
+              ) {
+                failedTokens.push({ symbol: token.symbol, reason: "No liquidity available" })
+              } else {
+                failedTokens.push({ symbol: token.symbol, reason: jupiterError.message || "Swap failed" })
+              }
+              continue
+            }
           }
 
-          const { quote, swapTransaction, outAmount } = await apiResponse.json()
-          console.log("[v0] ✅ Got swap transaction from Jupiter API route")
+          if (!swapTransaction) {
+            failedTokens.push({ symbol: token.symbol, reason: "No swap transaction generated" })
+            continue
+          }
 
           const expectedSol = Number(outAmount) / LAMPORTS_PER_SOL
           console.log("[v0] Expected SOL output:", expectedSol)
@@ -355,6 +427,7 @@ export class SolanaService {
         }
       }
 
+      // ... existing code for commission transfer ...
       console.log("[v0] ========================================")
       console.log("[v0] Swap phase completed!")
       console.log("[v0] Total SOL received from swaps:", totalSolReceived)

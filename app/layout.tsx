@@ -7,6 +7,7 @@ import { LanguageProvider } from "@/contexts/language-context"
 import { WalletProvider } from "@/contexts/wallet-context"
 import { Header } from "@/components/header"
 import { Toaster } from "@/components/ui/toaster"
+import { VersionBadge } from "@/components/version-badge"
 
 const _geist = Geist({ subsets: ["latin"] })
 const _geistMono = Geist_Mono({ subsets: ["latin"] })
@@ -48,6 +49,7 @@ export default function RootLayout({
             <Header />
             {children}
             <Toaster />
+            <VersionBadge />
           </LanguageProvider>
         </WalletProvider>
         <Analytics />
