@@ -217,18 +217,59 @@ export class SolanaService {
     userPublicKey: string,
     slippageBps = 500,
   ): Promise<{ swapTransaction: string; outAmount: string } | null> {
-    // First try API route
+    // Step 1: Try to get quote from public.jupiterapi.com (this works from browser)
+    let quote = null
+
+    for (const endpoint of JUPITER_ENDPOINTS) {
+      try {
+        console.log("[v0] Trying to get quote from:", endpoint.quote)
+
+        const quoteUrl = `${endpoint.quote}?inputMint=${inputMint}&outputMint=${outputMint}&amount=${amount}&slippageBps=${slippageBps}`
+
+        const quoteResponse = await fetch(quoteUrl, {
+          method: "GET",
+          headers: { Accept: "application/json" },
+        })
+
+        if (!quoteResponse.ok) {
+          console.log("[v0] Quote failed:", endpoint.quote, "status:", quoteResponse.status)
+          continue
+        }
+
+        const quoteText = await quoteResponse.text()
+
+        if (quoteText.startsWith("Invalid") || quoteText.startsWith("<!") || quoteText.startsWith("<")) {
+          console.log("[v0] Invalid response from:", endpoint.quote)
+          continue
+        }
+
+        quote = JSON.parse(quoteText)
+
+        if (quote && quote.outAmount) {
+          console.log("[v0] ✅ Quote received from", endpoint.quote, "- Output:", quote.outAmount)
+          break
+        }
+      } catch (e: any) {
+        console.log("[v0] Quote endpoint", endpoint.quote, "failed:", e.message)
+        continue
+      }
+    }
+
+    if (!quote) {
+      console.log("[v0] ❌ Could not get quote from any endpoint")
+      return null
+    }
+
+    // Step 2: Send quote to API route to get swap transaction (avoids CORS)
+    console.log("[v0] Sending quote to API route for swap transaction...")
+
     try {
-      console.log("[v0] Trying Jupiter via API route...")
       const apiResponse = await fetch("/api/jupiter-swap", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          inputMint,
-          outputMint,
-          amount: amount.toString(),
+          quote,
           userPublicKey,
-          slippageBps,
         }),
       })
 
@@ -236,82 +277,14 @@ export class SolanaService {
         const data = await apiResponse.json()
         if (data.swapTransaction) {
           console.log("[v0] ✅ Got swap transaction from API route")
-          return { swapTransaction: data.swapTransaction, outAmount: data.outAmount }
+          return { swapTransaction: data.swapTransaction, outAmount: quote.outAmount }
         }
       }
-      console.log("[v0] API route failed with status:", apiResponse.status)
+
+      const errorText = await apiResponse.text()
+      console.log("[v0] API route failed:", errorText)
     } catch (e: any) {
       console.log("[v0] API route exception:", e.message)
-    }
-
-    // Try each Jupiter endpoint directly from browser
-    for (const endpoint of JUPITER_ENDPOINTS) {
-      try {
-        console.log("[v0] Trying Jupiter endpoint:", endpoint.quote)
-
-        // Get quote
-        const quoteUrl = `${endpoint.quote}?inputMint=${inputMint}&outputMint=${outputMint}&amount=${amount}&slippageBps=${slippageBps}`
-
-        const quoteResponse = await fetch(quoteUrl, {
-          method: "GET",
-          headers: {
-            Accept: "application/json",
-          },
-        })
-
-        if (!quoteResponse.ok) {
-          console.log("[v0] Quote failed for endpoint:", endpoint.quote, "status:", quoteResponse.status)
-          continue
-        }
-
-        const quoteText = await quoteResponse.text()
-
-        // Check if response is valid JSON
-        if (quoteText.startsWith("Invalid") || quoteText.startsWith("<!") || quoteText.startsWith("<")) {
-          console.log("[v0] Invalid response from:", endpoint.quote)
-          continue
-        }
-
-        const quote = JSON.parse(quoteText)
-
-        if (!quote || !quote.outAmount) {
-          console.log("[v0] No valid quote from:", endpoint.quote)
-          continue
-        }
-
-        console.log("[v0] ✅ Quote received from", endpoint.quote, "- Output:", quote.outAmount)
-
-        // Get swap transaction
-        const swapResponse = await fetch(endpoint.swap, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Accept: "application/json",
-          },
-          body: JSON.stringify({
-            quoteResponse: quote,
-            userPublicKey,
-            wrapAndUnwrapSol: true,
-            dynamicComputeUnitLimit: true,
-            dynamicSlippage: true,
-          }),
-        })
-
-        if (!swapResponse.ok) {
-          console.log("[v0] Swap request failed for endpoint:", endpoint.swap)
-          continue
-        }
-
-        const swapData = await swapResponse.json()
-
-        if (swapData.swapTransaction) {
-          console.log("[v0] ✅ Got swap transaction from:", endpoint.swap)
-          return { swapTransaction: swapData.swapTransaction, outAmount: quote.outAmount }
-        }
-      } catch (e: any) {
-        console.log("[v0] Endpoint", endpoint.quote, "failed:", e.message)
-        continue
-      }
     }
 
     return null
