@@ -52,6 +52,15 @@ export const translations = {
     waiting: "Waiting",
     doNotCloseWindow: "Do not close this window. Confirm each transaction in your Phantom wallet.",
 
+    // Connection Error Translations
+    connectionBlocked: "Connection Blocked",
+    connectionBlockedDesc: "Phantom may have blocked this domain for security. Try the following:",
+    connectionBlockedStep1: "Open Phantom wallet settings",
+    connectionBlockedStep2: "Go to 'Trusted Apps' or 'Connected Sites'",
+    connectionBlockedStep3: "Remove this site and try connecting again",
+    connectionBlockedStep4: "Or try clearing your browser cache",
+    tryAgain: "Try Again",
+
     refresh: "Refresh",
   },
   pt: {
@@ -105,6 +114,15 @@ export const translations = {
     waiting: "Aguardando",
     doNotCloseWindow: "Não feche esta janela. Confirme cada transação na sua carteira Phantom.",
 
+    // Connection Error Translations
+    connectionBlocked: "Conexão Bloqueada",
+    connectionBlockedDesc: "A Phantom pode ter bloqueado este domínio por segurança. Tente o seguinte:",
+    connectionBlockedStep1: "Abra as configurações da carteira Phantom",
+    connectionBlockedStep2: "Vá em 'Apps Confiáveis' ou 'Sites Conectados'",
+    connectionBlockedStep3: "Remova este site e tente conectar novamente",
+    connectionBlockedStep4: "Ou tente limpar o cache do navegador",
+    tryAgain: "Tentar Novamente",
+
     refresh: "Atualizar",
   },
   es: {
@@ -157,6 +175,15 @@ export const translations = {
     sendingCommission: "Enviando comisión",
     waiting: "Esperando",
     doNotCloseWindow: "No cierres esta ventana. Confirma cada transacción en tu billetera Phantom.",
+
+    // Connection Error Translations
+    connectionBlocked: "Conexión Bloqueada",
+    connectionBlockedDesc: "Phantom puede haber bloqueado este dominio por seguridad. Intenta lo siguiente:",
+    connectionBlockedStep1: "Abre la configuración de la billetera Phantom",
+    connectionBlockedStep2: "Ve a 'Apps de Confianza' o 'Sitios Conectados'",
+    connectionBlockedStep3: "Elimina este sitio e intenta conectar nuevamente",
+    connectionBlockedStep4: "O intenta limpiar la caché del navegador",
+    tryAgain: "Intentar de Nuevo",
 
     refresh: "Actualizar",
   },

@@ -2,12 +2,12 @@
 
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
-import { Wallet, Power, CheckCircle2 } from "lucide-react"
+import { Wallet, Power, CheckCircle2, AlertTriangle, RefreshCw } from "lucide-react"
 import { useWallet } from "@/contexts/wallet-context"
 import { useLanguage } from "@/contexts/language-context"
 
 export function WalletConnect() {
-  const { connected, connecting, publicKey, connect, disconnect } = useWallet()
+  const { connected, connecting, publicKey, connect, disconnect, connectionError } = useWallet()
   const { t } = useLanguage()
 
   return (
@@ -49,6 +49,35 @@ export function WalletConnect() {
           )}
         </div>
       </div>
+
+      {connectionError === "phantom_blocked" && !connected && (
+        <div className="mt-6 rounded-lg border border-amber-500/30 bg-amber-500/10 p-4">
+          <div className="flex items-start gap-3">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-amber-500/20">
+              <AlertTriangle className="h-4 w-4 text-amber-500" />
+            </div>
+            <div className="flex-1">
+              <h3 className="font-semibold text-amber-500">{t.connectionBlocked}</h3>
+              <p className="mt-1 text-sm text-muted-foreground">{t.connectionBlockedDesc}</p>
+              <ol className="mt-3 space-y-1 text-sm text-muted-foreground list-decimal list-inside">
+                <li>{t.connectionBlockedStep1}</li>
+                <li>{t.connectionBlockedStep2}</li>
+                <li>{t.connectionBlockedStep3}</li>
+                <li>{t.connectionBlockedStep4}</li>
+              </ol>
+              <Button
+                onClick={connect}
+                variant="outline"
+                size="sm"
+                className="mt-4 gap-2 border-amber-500/50 text-amber-500 hover:bg-amber-500/10 bg-transparent"
+              >
+                <RefreshCw className="h-4 w-4" />
+                {t.tryAgain}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </Card>
   )
 }

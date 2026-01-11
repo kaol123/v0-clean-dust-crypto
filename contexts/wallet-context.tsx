@@ -1,7 +1,6 @@
 "use client"
 
 import { useRef } from "react"
-
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react"
 import { useToast } from "@/hooks/use-toast"
 import type { Token } from "@/types/token"
@@ -15,6 +14,7 @@ interface WalletContextType {
   loading: boolean
   cleaning: boolean
   refreshing: boolean
+  connectionError: string | null
   connect: () => Promise<void>
   disconnect: () => Promise<void>
   cleanupWallet: () => Promise<void>
@@ -37,6 +37,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     loading: boolean
     cleaning: boolean
     refreshing: boolean
+    connectionError: string | null
   }>({
     connected: false,
     connecting: false,
@@ -45,6 +46,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     loading: false,
     cleaning: false,
     refreshing: false,
+    connectionError: null,
   })
 
   const { toast } = useToast()
@@ -59,21 +61,13 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   }, [state])
 
   const connect = async () => {
-    console.log("[v0] ========== CONNECT FUNCTION CALLED ==========")
-    console.log("[v0] Window location:", typeof window !== "undefined" ? window.location.href : "SSR")
-    console.log("[v0] Window.solana exists:", typeof window !== "undefined" && "solana" in window)
-
-    setState((prev) => ({ ...prev, connecting: true }))
+    setState((prev) => ({ ...prev, connecting: true, connectionError: null }))
 
     try {
-      // @ts-ignore - Added detailed checks for Phantom
+      // @ts-ignore
       const { solana } = window
 
-      console.log("[v0] window.solana:", solana)
-      console.log("[v0] solana.isPhantom:", solana?.isPhantom)
-
       if (!solana?.isPhantom) {
-        console.error("[v0] ❌ Phantom not detected!")
         toast({
           title: "Phantom Not Found",
           description: "Please install the Phantom Wallet extension",
@@ -83,16 +77,8 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         return
       }
 
-      console.log("[v0] ✅ Phantom detected, calling connect()...")
-
       const response = await solana.connect()
-
-      console.log("[v0] ✅ Connect response received:", response)
-      console.log("[v0] Response publicKey:", response.publicKey)
-
       const pubKeyString = response.publicKey.toString()
-
-      console.log("[v0] ✅ GOT PUBLIC KEY:", pubKeyString)
 
       stateRef.current = {
         connected: true,
@@ -104,9 +90,8 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         connected: true,
         publicKey: pubKeyString,
         connecting: false,
+        connectionError: null,
       }))
-
-      console.log("[v0] ✅ STATE UPDATED - calling fetchTokens...")
 
       toast({
         title: "Wallet Connected!",
@@ -114,19 +99,28 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       })
 
       await fetchTokens(pubKeyString)
-
-      console.log("[v0] ========== CONNECT COMPLETE ==========")
     } catch (error) {
-      console.error("[v0] ❌ Connection error:", error)
-      console.error("[v0] Error type:", error instanceof Error ? error.constructor.name : typeof error)
-      console.error("[v0] Error message:", error instanceof Error ? error.message : String(error))
+      const errorMessage = error instanceof Error ? error.message : String(error)
+
+      let userMessage = "Could not connect to wallet"
+      let isPhantomBlock = false
+
+      if (errorMessage.includes("Unexpected error") || errorMessage.includes("User rejected")) {
+        isPhantomBlock = true
+        userMessage = "Connection blocked. Please check if the domain is allowed in Phantom settings."
+      }
+
+      setState((prev) => ({
+        ...prev,
+        connecting: false,
+        connectionError: isPhantomBlock ? "phantom_blocked" : "generic_error",
+      }))
 
       toast({
         title: "Connection Error",
-        description: error instanceof Error ? error.message : "Could not connect to wallet",
+        description: userMessage,
         variant: "destructive",
       })
-      setState((prev) => ({ ...prev, connecting: false }))
     }
   }
 
@@ -151,6 +145,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         loading: false,
         cleaning: false,
         refreshing: false,
+        connectionError: null,
       })
 
       toast({
@@ -163,14 +158,10 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   }
 
   const fetchTokens = async (walletAddress: string) => {
-    console.log("[v0] FETCH TOKENS START for", walletAddress)
-
     setState((prev) => ({ ...prev, loading: true }))
 
     try {
       const fetchedTokens = await solanaService.getTokenAccounts(walletAddress)
-
-      console.log("[v0] FETCHED", fetchedTokens.length, "tokens")
 
       setState((prev) => ({ ...prev, tokens: fetchedTokens, loading: false }))
 
@@ -224,14 +215,9 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   }
 
   const cleanupWallet = async () => {
-    console.log("[v0] cleanupWallet called - refreshing tokens...")
-
     if (!state.publicKey) {
-      console.error("[v0] No public key in state")
       return
     }
-
-    // Apenas atualizar lista de tokens após o cleanup
     await fetchTokens(state.publicKey)
   }
 
@@ -245,6 +231,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         loading: state.loading,
         cleaning: state.cleaning,
         refreshing: state.refreshing,
+        connectionError: state.connectionError,
         connect,
         disconnect,
         cleanupWallet,
