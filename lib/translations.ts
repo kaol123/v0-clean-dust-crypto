@@ -4,9 +4,9 @@ export const translations = {
   en: {
     // Hero
     poweredBy: "Powered by Solana",
-    title: "Clean Dust Crypto",
+    title: "Crypto Dust Cleaner",
     subtitle:
-      "Clean your Solana wallet from forgotten tokens and small amounts. Automatically convert tokens below $1 into SOL.",
+      "Clean your Solana wallet from forgotten tokens and small amounts. Automatically convert tokens below $5 into SOL.",
     commission: "Only 10% commission",
     instantConversion: "Instant conversion",
 
@@ -24,7 +24,8 @@ export const translations = {
     token: "token",
     tokens: "tokens",
     noTokensFound: "No tokens found in your wallet",
-    noTokensBelow: "No tokens below $1 found! Your wallet is clean.",
+    noTokensBelow: "No tokens below $5 found! Your wallet is clean.",
+    unknownToken: "Unknown Token",
 
     // Cleanup Summary
     cleanupSummary: "Cleanup Summary",
@@ -35,15 +36,19 @@ export const translations = {
     cleaning: "Cleaning...",
     cleanupComplete: "Cleanup Complete!",
     youReceived: "You received",
+    tokensCouldNotBeSwapped: "token could not be swapped",
+    tokensCouldNotBeSwappedPlural: "tokens could not be swapped",
+    insufficientLiquidity:
+      "These tokens may have insufficient liquidity. Try swapping them directly in your Phantom wallet.",
 
     refresh: "Refresh",
   },
   pt: {
     // Hero
     poweredBy: "Powered by Solana",
-    title: "Clean Dust Crypto",
+    title: "Crypto Dust Cleaner",
     subtitle:
-      "Limpe sua carteira Solana de tokens esquecidos e pequenos valores. Converta automaticamente tokens abaixo de $1 em SOL.",
+      "Limpe sua carteira Solana de tokens esquecidos e pequenos valores. Converta automaticamente tokens abaixo de $5 em SOL.",
     commission: "Comissão de apenas 10%",
     instantConversion: "Conversão instantânea",
 
@@ -61,7 +66,8 @@ export const translations = {
     token: "token",
     tokens: "tokens",
     noTokensFound: "Nenhum token encontrado na sua carteira",
-    noTokensBelow: "Nenhum token abaixo de $1 encontrado! Sua carteira está limpa.",
+    noTokensBelow: "Nenhum token abaixo de $5 encontrado! Sua carteira está limpa.",
+    unknownToken: "Token Desconhecido",
 
     // Cleanup Summary
     cleanupSummary: "Resumo da Limpeza",
@@ -72,15 +78,19 @@ export const translations = {
     cleaning: "Limpando...",
     cleanupComplete: "Limpeza Concluída!",
     youReceived: "Você recebeu",
+    tokensCouldNotBeSwapped: "token não pôde ser trocado",
+    tokensCouldNotBeSwappedPlural: "tokens não puderam ser trocados",
+    insufficientLiquidity:
+      "Estes tokens podem não ter liquidez suficiente. Tente trocá-los diretamente na sua carteira Phantom.",
 
     refresh: "Atualizar",
   },
   es: {
     // Hero
     poweredBy: "Powered by Solana",
-    title: "Clean Dust Crypto",
+    title: "Crypto Dust Cleaner",
     subtitle:
-      "Limpia tu billetera Solana de tokens olvidados y pequeños valores. Convierte automáticamente tokens por debajo de $1 en SOL.",
+      "Limpia tu billetera Solana de tokens olvidados y pequeños valores. Convierte automáticamente tokens por debajo de $5 en SOL.",
     commission: "Solo 10% de comisión",
     instantConversion: "Conversión instantánea",
 
@@ -98,7 +108,8 @@ export const translations = {
     token: "token",
     tokens: "tokens",
     noTokensFound: "No se encontraron tokens en tu billetera",
-    noTokensBelow: "¡No se encontraron tokens por debajo de $1! Tu billetera está limpia.",
+    noTokensBelow: "¡No se encontraron tokens por debajo de $5! Tu billetera está limpia.",
+    unknownToken: "Token Desconocido",
 
     // Cleanup Summary
     cleanupSummary: "Resumen de Limpieza",
@@ -109,6 +120,10 @@ export const translations = {
     cleaning: "Limpiando...",
     cleanupComplete: "¡Limpieza Completada!",
     youReceived: "Recibiste",
+    tokensCouldNotBeSwapped: "token no pudo ser intercambiado",
+    tokensCouldNotBeSwappedPlural: "tokens no pudieron ser intercambiados",
+    insufficientLiquidity:
+      "Estos tokens pueden no tener suficiente liquidez. Intenta intercambiarlos directamente en tu billetera Phantom.",
 
     refresh: "Actualizar",
   },

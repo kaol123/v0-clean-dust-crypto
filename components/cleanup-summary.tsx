@@ -2,13 +2,12 @@
 
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Sparkles, TrendingUp, Percent, AlertCircle, ExternalLink } from "lucide-react"
+import { Sparkles, TrendingUp, Percent, AlertCircle } from "lucide-react"
 import type { Token } from "@/types/token"
 import { useLanguage } from "@/contexts/language-context"
 import { useState } from "react"
 import { useToast } from "@/hooks/use-toast"
 import { SolanaService } from "@/lib/solana-service"
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 
 interface CleanupSummaryProps {
   tokens: Token[]
@@ -22,7 +21,7 @@ export function CleanupSummary({ tokens, cleaning, onCleanup }: CleanupSummaryPr
   const [isProcessing, setIsProcessing] = useState(false)
   const [failedTokens, setFailedTokens] = useState<{ symbol: string; reason: string }[]>([])
 
-  const dustTokens = tokens.filter((token) => token.usdValue < 1)
+  const dustTokens = tokens.filter((token) => token.usdValue < 5)
 
   const totalValueSol = dustTokens.reduce((sum, token) => sum + token.solValue, 0)
   const totalValueUsd = dustTokens.reduce((sum, token) => sum + token.usdValue, 0)
@@ -49,7 +48,7 @@ export function CleanupSummary({ tokens, cleaning, onCleanup }: CleanupSummaryPr
     if (dustTokens.length === 0) {
       toast({
         title: "No Dust Tokens",
-        description: "All your tokens are above $1",
+        description: "All your tokens are above $5",
       })
       return
     }
@@ -108,8 +107,8 @@ export function CleanupSummary({ tokens, cleaning, onCleanup }: CleanupSummaryPr
 
       if (successfulSwaps > 0) {
         toast({
-          title: "Cleanup Complete!",
-          description: `Successfully swapped ${successfulSwaps} token(s). You received ${result.userReceives.toFixed(6)} SOL. Commission: ${result.commission.toFixed(6)} SOL`,
+          title: t.cleanupComplete,
+          description: `${t.youReceived} ${result.userReceives.toFixed(6)} SOL`,
         })
       } else {
         toast({
@@ -142,7 +141,7 @@ export function CleanupSummary({ tokens, cleaning, onCleanup }: CleanupSummaryPr
 
   console.log("[v0] ========== CLEANUP SUMMARY RENDER ==========")
   console.log("[v0] Total tokens received:", tokens.length)
-  console.log("[v0] Dust tokens (< $1):", dustTokens.length)
+  console.log("[v0] Dust tokens (< $5):", dustTokens.length)
   console.log("[v0] Is loading:", isLoading)
   console.log("[v0] Button will be rendered:", dustTokens.length > 0)
   console.log("[v0] ===============================================")
@@ -160,45 +159,33 @@ export function CleanupSummary({ tokens, cleaning, onCleanup }: CleanupSummaryPr
   return (
     <div className="space-y-4">
       {failedTokens.length > 0 && (
-        <Alert variant="destructive">
-          <AlertCircle className="h-4 w-4" />
-          <AlertTitle>Some Tokens Could Not Be Swapped</AlertTitle>
-          <AlertDescription className="mt-2">
-            <p className="mb-2">The following tokens failed to swap:</p>
-            <ul className="list-disc pl-5 space-y-1">
-              {failedTokens.map((token, i) => (
-                <li key={i}>
-                  <strong>{token.symbol}</strong>: {token.reason}
-                </li>
-              ))}
-            </ul>
-            <div className="mt-3 flex items-start gap-2 rounded-md bg-destructive/10 p-3">
-              <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
-              <div className="text-sm">
-                <p className="font-medium mb-1">Alternative Solution:</p>
-                <p className="mb-2">
-                  You can swap these tokens directly in Phantom wallet using their built-in swap feature:
-                </p>
-                <ol className="list-decimal pl-5 space-y-1">
-                  <li>Open Phantom wallet</li>
-                  <li>Click on the token you want to swap</li>
-                  <li>Click "Swap" button</li>
-                  <li>Select SOL as output</li>
-                  <li>Complete the swap</li>
-                </ol>
-                <a
-                  href="https://help.phantom.app/hc/en-us/articles/4406388623251-How-to-swap-tokens-in-Phantom"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="mt-2 inline-flex items-center gap-1 text-primary hover:underline"
-                >
-                  Learn more about swapping in Phantom
-                  <ExternalLink className="h-3 w-3" />
-                </a>
-              </div>
+        <div className="relative overflow-hidden rounded-xl border border-amber-500/30 bg-gradient-to-r from-amber-500/10 via-orange-500/10 to-amber-500/10 p-4">
+          <div className="absolute inset-0 bg-gradient-to-r from-amber-500/5 to-orange-500/5 animate-pulse" />
+          <div className="relative flex items-start gap-4">
+            <div className="flex-shrink-0 rounded-full bg-gradient-to-br from-amber-500 to-orange-500 p-2">
+              <AlertCircle className="h-5 w-5 text-white" />
             </div>
-          </AlertDescription>
-        </Alert>
+            <div className="flex-1 min-w-0">
+              <h4 className="text-base font-semibold text-amber-200 mb-2">
+                {failedTokens.length}{" "}
+                {failedTokens.length > 1 ? t.tokensCouldNotBeSwappedPlural : t.tokensCouldNotBeSwapped}
+              </h4>
+              <div className="flex flex-wrap gap-2 mb-3">
+                {failedTokens.map((token, i) => (
+                  <span
+                    key={i}
+                    className="inline-flex items-center gap-2 bg-amber-500/20 border border-amber-500/30 rounded-lg px-3 py-1.5 text-sm font-medium text-amber-100"
+                    title={token.reason}
+                  >
+                    <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
+                    {token.symbol}
+                  </span>
+                ))}
+              </div>
+              <p className="text-sm text-amber-200/70">{t.insufficientLiquidity}</p>
+            </div>
+          </div>
+        </div>
       )}
 
       <Card className="border-2 border-primary/20 bg-gradient-to-br from-primary/5 to-accent/5 p-6">

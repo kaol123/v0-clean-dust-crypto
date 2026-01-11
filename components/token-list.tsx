@@ -4,7 +4,7 @@ import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
-import { Coins, DollarSign, RefreshCw } from "lucide-react"
+import { Coins, DollarSign, RefreshCw, Trash2 } from "lucide-react"
 import type { Token } from "@/types/token"
 import { useLanguage } from "@/contexts/language-context"
 import { useWallet } from "@/contexts/wallet-context"
@@ -19,16 +19,17 @@ export function TokenList({ tokens, loading }: TokenListProps) {
   const { t } = useLanguage()
   const { refreshTokens, refreshing } = useWallet()
 
-  console.log("[v0] TokenList render:", { tokensCount: tokens.length, loading })
-  console.log("[v0] TokenList all tokens:", tokens)
-
-  const dustTokens = tokens.filter((token) => token.usdValue < 1)
-  console.log("[v0] TokenList dust tokens:", dustTokens.length, dustTokens)
+  const dustTokens = tokens.filter((token) => token.usdValue < 5)
 
   if (loading) {
     return (
       <Card className="p-6">
-        <h3 className="mb-4 text-xl font-semibold">{t.yourTokens}</h3>
+        <div className="mb-4 flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/20">
+            <Trash2 className="h-5 w-5 text-primary" />
+          </div>
+          <h3 className="text-xl font-semibold">{t.yourTokens}</h3>
+        </div>
         <div className="space-y-3">
           {[...Array(5)].map((_, i) => (
             <Skeleton key={i} className="h-16 w-full" />
@@ -50,7 +51,12 @@ export function TokenList({ tokens, loading }: TokenListProps) {
   return (
     <Card className="p-6">
       <div className="mb-6 flex items-center justify-between">
-        <h3 className="text-xl font-semibold">{t.tokensToClean}</h3>
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-primary/30 to-accent/30">
+            <Trash2 className="h-5 w-5 text-primary" />
+          </div>
+          <h3 className="text-xl font-semibold">{t.tokensToClean}</h3>
+        </div>
         <div className="flex items-center gap-2">
           <Badge variant="secondary" className="text-sm">
             {dustTokens.length} {dustTokens.length === 1 ? t.token : t.tokens}
@@ -99,7 +105,7 @@ export function TokenList({ tokens, loading }: TokenListProps) {
                 </div>
                 <div>
                   <p className="font-semibold">{token.symbol}</p>
-                  <p className="text-xs text-muted-foreground">{token.name}</p>
+                  <p className="text-xs text-muted-foreground">{token.name || t.unknownToken}</p>
                   <p className="text-xs text-muted-foreground">
                     {token.balance.toFixed(4)} {t.tokens}
                   </p>

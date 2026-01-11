@@ -1,0 +1,24 @@
+<svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="gradient1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#14F195;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#9945FF;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="gradient2" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#9945FF;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#14F195;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  <!-- Outer circle -->
+  <circle cx="24" cy="24" r="22" stroke="url(#gradient1)" stroke-width="3" fill="none"/>
+  <!-- Broom/cleaning icon stylized -->
+  <path d="M16 32L24 16L32 32" stroke="url(#gradient2)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <!-- Sparkles -->
+  <circle cx="24" cy="12" r="2" fill="#14F195"/>
+  <circle cx="36" cy="20" r="1.5" fill="#9945FF"/>
+  <circle cx="12" cy="20" r="1.5" fill="#14F195"/>
+  <!-- Dust particles being cleaned -->
+  <circle cx="18" cy="36" r="1" fill="#9945FF" opacity="0.7"/>
+  <circle cx="24" cy="38" r="1.2" fill="#14F195" opacity="0.7"/>
+  <circle cx="30" cy="36" r="1" fill="#9945FF" opacity="0.7"/>
+</svg>

@@ -13,26 +13,14 @@ const _geist = Geist({ subsets: ["latin"] })
 const _geistMono = Geist_Mono({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "Clean Dust Crypto - Clean Your Solana Wallet",
+  title: "Crypto Dust Cleaner - Clean Your Solana Wallet",
   description:
-    "Automatically convert small token balances below $1 into SOL. Clean your Solana wallet dust with just one click.",
+    "Automatically convert small token balances below $5 into SOL. Clean your Solana wallet dust with just one click.",
   generator: "v0.app",
   icons: {
-    icon: [
-      {
-        url: "/icon-light-32x32.png",
-        media: "(prefers-color-scheme: light)",
-      },
-      {
-        url: "/icon-dark-32x32.png",
-        media: "(prefers-color-scheme: dark)",
-      },
-      {
-        url: "/icon.svg",
-        type: "image/svg+xml",
-      },
-    ],
-    apple: "/apple-icon.png",
+    icon: "/favicon.svg",
+    shortcut: "/favicon.svg",
+    apple: "/favicon.svg",
   },
 }
 

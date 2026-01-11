@@ -174,11 +174,11 @@ export function WalletProvider({ children }: { children: ReactNode }) {
 
       setState((prev) => ({ ...prev, tokens: fetchedTokens, loading: false }))
 
-      const dustCount = fetchedTokens.filter((t) => t.usdValue < 1).length
+      const dustCount = fetchedTokens.filter((t) => t.usdValue < 5).length
 
       toast({
         title: "Tokens Loaded!",
-        description: `Found ${fetchedTokens.length} tokens (${dustCount} below $1)`,
+        description: `Found ${fetchedTokens.length} tokens (${dustCount} below $5)`,
       })
     } catch (error) {
       console.error("[v0] Error fetching tokens:", error)
@@ -210,7 +210,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
 
       toast({
         title: "Tokens Refreshed!",
-        description: `Found ${fetchedTokens.length} token(s) below $1`,
+        description: `Found ${fetchedTokens.length} token(s) below $5`,
       })
     } catch (error) {
       console.error("[v0] Error refreshing tokens:", error)

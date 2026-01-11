@@ -2,6 +2,7 @@
 
 import { Sparkles, Trash2 } from "lucide-react"
 import { useLanguage } from "@/contexts/language-context"
+import { Logo } from "@/components/logo"
 
 export function Hero() {
   const { t } = useLanguage()
@@ -17,7 +18,10 @@ export function Hero() {
             {t.poweredBy}
           </div>
 
-          <h1 className="mb-6 text-balance text-5xl font-bold tracking-tight md:text-7xl">{t.title}</h1>
+          <div className="mb-6 flex items-center justify-center gap-4">
+            <Logo size={64} />
+            <h1 className="text-balance text-5xl font-bold tracking-tight md:text-7xl">{t.title}</h1>
+          </div>
 
           <p className="mb-8 text-pretty text-xl text-muted-foreground md:text-2xl">{t.subtitle}</p>
 

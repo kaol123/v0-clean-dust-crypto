@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 480">
+  <g fill-rule="evenodd">
+    <g stroke-width="1pt">
+      <path fill="#bd3d44" d="M0 0h640v37H0zm0 74h640v37H0zm0 73h640v37H0zm0 74h640v37H0zm0 73h640v37H0zm0 74h640v37H0zm0 73h640v37H0z"/>
+      <path fill="#fff" d="M0 37h640v37H0zm0 73h640v37H0zm0 74h640v37H0zm0 73h640v37H0zm0 74h640v37H0zm0 73h640v37H0z"/>
+    </g>
+    <path fill="#192f5d" d="M0 0h260v259H0z"/>
+    <g fill="#fff">
+      <g id="d">
+        <g id="c">
+          <g id="e">
+            <g id="b">
+              <path id="a" d="M30 11l2.5 7.5H40l-6 4.5 2.5 7.5-6.5-5-6.5 5 2.5-7.5-6-4.5h7.5z"/>
+              <use href="#a" y="42"/>
+              <use href="#a" y="84"/>
+            </g>
+            <use href="#a" y="126"/>
+            <use href="#a" y="168"/>
+          </g>
+          <use href="#a" y="210"/>
+        </g>
+        <use href="#b" x="52"/>
+      </g>
+      <use href="#c" x="104"/>
+      <use href="#d" x="156"/>
+      <use href="#e" x="208"/>
+    </g>
+  </g>
+</svg>
