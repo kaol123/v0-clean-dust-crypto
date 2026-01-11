@@ -114,10 +114,13 @@ export class SolanaService {
       const publicKey = new PublicKey(walletAddress)
 
       const solPrice = await this.getSolPrice()
+      console.log("[v0] SOL price:", solPrice)
 
       const tokenAccounts = await this.connection.getParsedTokenAccountsByOwner(publicKey, {
         programId: new PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"),
       })
+
+      console.log("[v0] Total token accounts found:", tokenAccounts.value.length)
 
       const accountsWithBalance = []
       const mints = []
@@ -125,6 +128,8 @@ export class SolanaService {
       for (const account of tokenAccounts.value) {
         const tokenInfo = account.account.data.parsed.info
         const balance = tokenInfo.tokenAmount.uiAmount
+
+        console.log("[v0] Token found:", tokenInfo.mint, "balance:", balance)
 
         if (balance > 0) {
           accountsWithBalance.push({
@@ -136,6 +141,8 @@ export class SolanaService {
         }
       }
 
+      console.log("[v0] Tokens with balance:", accountsWithBalance.length)
+
       const priceMap = await this.getTokenPrices(mints)
 
       const tokens: Token[] = []
@@ -146,6 +153,8 @@ export class SolanaService {
         const metadata = await this.getTokenMetadata(mint)
         const usdPrice = priceMap.get(mint) || 0
         const totalUsdValue = balance * usdPrice
+
+        console.log("[v0] Processing token:", metadata.symbol, "USD value:", totalUsdValue)
 
         tokens.push({
           symbol: metadata.symbol,
@@ -159,8 +168,11 @@ export class SolanaService {
         })
       }
 
+      console.log("[v0] Total tokens returned:", tokens.length)
+
       return tokens
     } catch (error) {
+      console.error("[v0] Error in getTokenAccounts:", error)
       throw error
     }
   }
