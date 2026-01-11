@@ -11,7 +11,7 @@ import {
   RefreshCw,
   Download,
   Smartphone,
-  Globe,
+  Search,
   Copy,
   Check,
 } from "lucide-react"
@@ -85,27 +85,29 @@ export function WalletConnect() {
 
           <div className="w-full mt-4 p-4 rounded-lg bg-background/50 border border-border/50">
             <h3 className="font-semibold text-sm text-foreground mb-3">{t.howToOpen}</h3>
-            <ol className="text-left space-y-2 text-sm text-muted-foreground">
+            <ol className="text-left space-y-3 text-sm text-muted-foreground">
               <li className="flex items-start gap-2">
                 <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-purple-500/20 text-xs text-purple-400">
                   1
                 </span>
-                {t.mobileStep1}
+                <span>{t.mobileStep1}</span>
               </li>
               <li className="flex items-start gap-2">
                 <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-purple-500/20 text-xs text-purple-400">
                   2
                 </span>
-                <span className="flex items-center gap-1">
+                <span className="flex items-center gap-2 flex-wrap">
                   {t.mobileStep2}
-                  <Globe className="h-4 w-4 inline text-purple-400" />
+                  <span className="inline-flex items-center justify-center h-7 w-7 rounded-lg bg-purple-500/30 border border-purple-500/50">
+                    <Search className="h-4 w-4 text-purple-400" />
+                  </span>
                 </span>
               </li>
               <li className="flex items-start gap-2">
                 <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-purple-500/20 text-xs text-purple-400">
                   3
                 </span>
-                {t.mobileStep3}
+                <span>{t.mobileStep3}</span>
               </li>
             </ol>
           </div>
