@@ -116,16 +116,25 @@ export class SolanaService {
       const solPrice = await this.getSolPrice()
       console.log("[v0] SOL price:", solPrice)
 
-      const tokenAccounts = await this.connection.getParsedTokenAccountsByOwner(publicKey, {
-        programId: new PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"),
-      })
+      const [tokenAccounts, token2022Accounts] = await Promise.all([
+        this.connection.getParsedTokenAccountsByOwner(publicKey, {
+          programId: new PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"),
+        }),
+        this.connection.getParsedTokenAccountsByOwner(publicKey, {
+          programId: new PublicKey("TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"),
+        }),
+      ])
 
-      console.log("[v0] Total token accounts found:", tokenAccounts.value.length)
+      const allTokenAccounts = [...tokenAccounts.value, ...token2022Accounts.value]
+
+      console.log("[v0] SPL Token accounts found:", tokenAccounts.value.length)
+      console.log("[v0] Token-2022 accounts found:", token2022Accounts.value.length)
+      console.log("[v0] Total token accounts found:", allTokenAccounts.length)
 
       const accountsWithBalance = []
       const mints = []
 
-      for (const account of tokenAccounts.value) {
+      for (const account of allTokenAccounts) {
         const tokenInfo = account.account.data.parsed.info
         const balance = tokenInfo.tokenAmount.uiAmount
 

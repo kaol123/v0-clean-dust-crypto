@@ -9,6 +9,14 @@ export const translations = {
       "Clean your Solana wallet from forgotten tokens and small amounts. Automatically convert tokens below $5 into SOL.",
     commission: "Only 10% commission",
     instantConversion: "Instant conversion",
+    autoDisconnect: "Auto-disconnect 2min",
+    secureConnection: "Secure Connection",
+    securityTitle: "Your Security is Our Priority",
+    secureConnectionDesc: "Encrypted and protected data",
+    autoDisconnectDesc: "Automatic protection after inactivity",
+    noDataStored: "No data stored",
+    readOnlyAccess: "Read-only access",
+    transparentFees: "Transparent fees",
 
     // Wallet Connect
     connectWallet: "Connect Your Wallet",
@@ -61,7 +69,29 @@ export const translations = {
     connectionBlockedStep4: "Or try clearing your browser cache",
     tryAgain: "Try Again",
 
+    securitySession: "Security Session",
+    autoDisconnectInfo: "Auto-disconnect for your security. Activity resets timer.",
+    sessionExpiringSoon: "Session expiring soon! Interact to extend.",
+    extendSession: "Extend",
+    sessionExpired: "Session Expired",
+    sessionExpiredDesc: "Your wallet was disconnected for security.",
+    removeFromConnectedAppsTitle: "To fully disconnect:",
+    removeFromConnectedApps: "Open Phantom → Settings → Connected Apps → Remove this site",
     refresh: "Refresh",
+
+    phantomNotInstalled: "Phantom Wallet Not Found",
+    phantomNotInstalledDesc: "To use this app, you need the Phantom wallet extension installed.",
+    installPhantom: "Install Phantom Wallet",
+
+    // Mobile instructions
+    openInPhantomBrowser: "Open in Phantom Browser",
+    mobileInstructions: "For the best experience on mobile, open this site in the Phantom app browser.",
+    howToOpen: "How to open:",
+    mobileStep1: "Open the Phantom app on your phone",
+    mobileStep2: "Tap the globe icon (browser) at the bottom",
+    mobileStep3: "Paste the URL below in the address bar",
+    copyUrl: "Copy URL",
+    urlCopied: "URL Copied!",
   },
   pt: {
     // Hero
@@ -71,11 +101,19 @@ export const translations = {
       "Limpe sua carteira Solana de tokens esquecidos e pequenos valores. Converta automaticamente tokens abaixo de $5 em SOL.",
     commission: "Comissão de apenas 10%",
     instantConversion: "Conversão instantânea",
+    autoDisconnect: "Desconexão auto 2min",
+    secureConnection: "Conexão Segura",
+    securityTitle: "Sua Segurança é Nossa Prioridade",
+    secureConnectionDesc: "Dados criptografados e protegidos",
+    autoDisconnectDesc: "Proteção automática após inatividade",
+    noDataStored: "Nenhum dado armazenado",
+    readOnlyAccess: "Acesso somente leitura",
+    transparentFees: "Taxas transparentes",
 
     // Wallet Connect
     connectWallet: "Conecte sua Carteira",
     walletConnected: "Carteira Conectada",
-    connectPhantom: "Conecte sua carteira Phantom para começar",
+    connectPhantom: "Conecte sua billetera Phantom para começar",
     disconnect: "Desconectar",
     connecting: "Conectando...",
     connectButton: "Conectar Phantom",
@@ -112,7 +150,7 @@ export const translations = {
     swappingToken: "Trocando token",
     sendingCommission: "Enviando comissão",
     waiting: "Aguardando",
-    doNotCloseWindow: "Não feche esta janela. Confirme cada transação na sua carteira Phantom.",
+    doNotCloseWindow: "Não feche esta janela. Confirme cada transação na sua billetera Phantom.",
 
     // Connection Error Translations
     connectionBlocked: "Conexão Bloqueada",
@@ -123,7 +161,29 @@ export const translations = {
     connectionBlockedStep4: "Ou tente limpar o cache do navegador",
     tryAgain: "Tentar Novamente",
 
+    securitySession: "Sessão de Segurança",
+    autoDisconnectInfo: "Desconexão automática para sua segurança. Atividade reinicia o tempo.",
+    sessionExpiringSoon: "Sessão expirando em breve! Interaja para estender.",
+    extendSession: "Estender",
+    sessionExpired: "Sessão Expirada",
+    sessionExpiredDesc: "Sua carteira foi desconectada por segurança.",
+    removeFromConnectedAppsTitle: "Para desconectar completamente:",
+    removeFromConnectedApps: "Abra Phantom → Configurações → Apps Conectadas → Remova este site",
     refresh: "Atualizar",
+
+    phantomNotInstalled: "Phantom Wallet Não Encontrada",
+    phantomNotInstalledDesc: "Para usar este app, você precisa da extensão Phantom instalada.",
+    installPhantom: "Instalar Phantom Wallet",
+
+    // Mobile instructions
+    openInPhantomBrowser: "Abrir no Navegador Phantom",
+    mobileInstructions: "Para melhor experiência no celular, abra este site no navegador do app Phantom.",
+    howToOpen: "Como abrir:",
+    mobileStep1: "Abra o app Phantom no seu celular",
+    mobileStep2: "Toque no ícone do globo (navegador) na parte inferior",
+    mobileStep3: "Cole a URL abaixo na barra de endereço",
+    copyUrl: "Copiar URL",
+    urlCopied: "URL Copiada!",
   },
   es: {
     // Hero
@@ -133,6 +193,14 @@ export const translations = {
       "Limpia tu billetera Solana de tokens olvidados y pequeños valores. Convierte automáticamente tokens por debajo de $5 en SOL.",
     commission: "Solo 10% de comisión",
     instantConversion: "Conversión instantánea",
+    autoDisconnect: "Desconexión auto 2min",
+    secureConnection: "Conexión Segura",
+    securityTitle: "Tu Seguridad es Nuestra Prioridad",
+    secureConnectionDesc: "Datos encriptados y protegidos",
+    autoDisconnectDesc: "Protección automática tras inactividad",
+    noDataStored: "Ningún dato almacenado",
+    readOnlyAccess: "Acceso solo lectura",
+    transparentFees: "Tarifas transparentes",
 
     // Wallet Connect
     connectWallet: "Conecta tu Billetera",
@@ -185,6 +253,28 @@ export const translations = {
     connectionBlockedStep4: "O intenta limpiar la caché del navegador",
     tryAgain: "Intentar de Nuevo",
 
+    securitySession: "Sesión de Seguridad",
+    autoDisconnectInfo: "Desconexión automática por tu seguridad. La actividad reinicia el tiempo.",
+    sessionExpiringSoon: "¡Sesión expirando pronto! Interactúa para extender.",
+    extendSession: "Extender",
+    sessionExpired: "Sesión Expirada",
+    sessionExpiredDesc: "Tu billetera fue desconectada por seguridad.",
+    removeFromConnectedAppsTitle: "Para desconectar completamente:",
+    removeFromConnectedApps: "Abre Phantom → Configuración → Apps Conectadas → Elimina este sitio",
     refresh: "Actualizar",
+
+    phantomNotInstalled: "Phantom Wallet No Encontrada",
+    phantomNotInstalledDesc: "Para usar esta app, necesitas la extensión Phantom instalada.",
+    installPhantom: "Instalar Phantom Wallet",
+
+    // Mobile instructions
+    openInPhantomBrowser: "Abrir en Navegador Phantom",
+    mobileInstructions: "Para mejor experiencia en móvil, abre este sitio en el navegador de la app Phantom.",
+    howToOpen: "Cómo abrir:",
+    mobileStep1: "Abre la app Phantom en tu celular",
+    mobileStep2: "Toca el ícono del globo (navegador) en la parte inferior",
+    mobileStep3: "Pega la URL abajo en la barra de direcciones",
+    copyUrl: "Copiar URL",
+    urlCopied: "¡URL Copiada!",
   },
 }

@@ -1,14 +1,175 @@
 "use client"
 
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
-import { Wallet, Power, CheckCircle2, AlertTriangle, RefreshCw } from "lucide-react"
+import {
+  Wallet,
+  Power,
+  CheckCircle2,
+  AlertTriangle,
+  RefreshCw,
+  Download,
+  Smartphone,
+  Globe,
+  Copy,
+  Check,
+} from "lucide-react"
 import { useWallet } from "@/contexts/wallet-context"
 import { useLanguage } from "@/contexts/language-context"
 
 export function WalletConnect() {
   const { connected, connecting, publicKey, connect, disconnect, connectionError } = useWallet()
   const { t } = useLanguage()
+
+  const [hasPhantom, setHasPhantom] = useState<boolean | null>(null)
+  const [isMobile, setIsMobile] = useState(false)
+  const [isInPhantomBrowser, setIsInPhantomBrowser] = useState(false)
+  const [urlCopied, setUrlCopied] = useState(false)
+  const [siteUrl, setSiteUrl] = useState("")
+
+  useEffect(() => {
+    // Check if mobile device
+    const checkMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+    setIsMobile(checkMobile)
+
+    // Get current site URL
+    setSiteUrl(window.location.origin)
+
+    // Check if Phantom is available
+    const checkPhantom = () => {
+      const phantom = (window as any).solana
+      const isPhantom = phantom?.isPhantom === true
+      setHasPhantom(isPhantom)
+
+      // Check if we're inside Phantom's in-app browser
+      setIsInPhantomBrowser(isPhantom && checkMobile)
+    }
+
+    // Check immediately and after a delay (extension might load slowly)
+    checkPhantom()
+    const timeout = setTimeout(checkPhantom, 1000)
+
+    return () => clearTimeout(timeout)
+  }, [])
+
+  const copyUrl = async () => {
+    try {
+      await navigator.clipboard.writeText(siteUrl)
+      setUrlCopied(true)
+      setTimeout(() => setUrlCopied(false), 2000)
+    } catch (err) {
+      // Fallback for older browsers
+      const textArea = document.createElement("textarea")
+      textArea.value = siteUrl
+      document.body.appendChild(textArea)
+      textArea.select()
+      document.execCommand("copy")
+      document.body.removeChild(textArea)
+      setUrlCopied(true)
+      setTimeout(() => setUrlCopied(false), 2000)
+    }
+  }
+
+  if (isMobile && !isInPhantomBrowser && hasPhantom === false) {
+    return (
+      <Card className="border-2 border-purple-500/30 bg-gradient-to-br from-purple-500/10 to-blue-500/10 p-6">
+        <div className="flex flex-col items-center text-center gap-4">
+          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-purple-500/20">
+            <Smartphone className="h-8 w-8 text-purple-400" />
+          </div>
+          <div>
+            <h2 className="text-xl font-bold text-purple-400">{t.openInPhantomBrowser}</h2>
+            <p className="mt-2 text-muted-foreground">{t.mobileInstructions}</p>
+          </div>
+
+          <div className="w-full mt-4 p-4 rounded-lg bg-background/50 border border-border/50">
+            <h3 className="font-semibold text-sm text-foreground mb-3">{t.howToOpen}</h3>
+            <ol className="text-left space-y-2 text-sm text-muted-foreground">
+              <li className="flex items-start gap-2">
+                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-purple-500/20 text-xs text-purple-400">
+                  1
+                </span>
+                {t.mobileStep1}
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-purple-500/20 text-xs text-purple-400">
+                  2
+                </span>
+                <span className="flex items-center gap-1">
+                  {t.mobileStep2}
+                  <Globe className="h-4 w-4 inline text-purple-400" />
+                </span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-purple-500/20 text-xs text-purple-400">
+                  3
+                </span>
+                {t.mobileStep3}
+              </li>
+            </ol>
+          </div>
+
+          <div className="w-full mt-2">
+            <div className="flex items-center gap-2 p-3 rounded-lg bg-background border border-border">
+              <code className="flex-1 text-sm text-muted-foreground truncate">{siteUrl}</code>
+              <Button
+                onClick={copyUrl}
+                size="sm"
+                variant={urlCopied ? "default" : "outline"}
+                className={`gap-2 shrink-0 ${urlCopied ? "bg-green-500 hover:bg-green-500" : ""}`}
+              >
+                {urlCopied ? (
+                  <>
+                    <Check className="h-4 w-4" />
+                    {t.urlCopied}
+                  </>
+                ) : (
+                  <>
+                    <Copy className="h-4 w-4" />
+                    {t.copyUrl}
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        </div>
+      </Card>
+    )
+  }
+
+  if (!isMobile && hasPhantom === false) {
+    return (
+      <Card className="border-2 border-purple-500/30 bg-gradient-to-br from-purple-500/10 to-blue-500/10 p-6">
+        <div className="flex flex-col items-center text-center gap-4 sm:flex-row sm:text-left">
+          <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-purple-500/20">
+            <Download className="h-8 w-8 text-purple-400" />
+          </div>
+          <div className="flex-1">
+            <h2 className="text-xl font-bold text-purple-400">{t.phantomNotInstalled}</h2>
+            <p className="mt-1 text-muted-foreground">{t.phantomNotInstalledDesc}</p>
+          </div>
+          <Button asChild size="lg" className="gap-2 bg-purple-600 hover:bg-purple-700">
+            <a href="https://phantom.app/download" target="_blank" rel="noopener noreferrer">
+              <Download className="h-5 w-5" />
+              {t.installPhantom}
+            </a>
+          </Button>
+        </div>
+      </Card>
+    )
+  }
+
+  if (hasPhantom === null) {
+    return (
+      <Card className="border-2 border-border/50 bg-card p-6">
+        <div className="flex items-center justify-center gap-3 py-4">
+          <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent"></div>
+          <span className="text-muted-foreground">{t.connecting}</span>
+        </div>
+      </Card>
+    )
+  }
 
   return (
     <Card className="border-2 border-border/50 bg-card p-6">
