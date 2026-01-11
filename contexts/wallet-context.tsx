@@ -1,7 +1,7 @@
 "use client"
 
 import { useRef } from "react"
-import { createContext, useContext, useState, useEffect, type ReactNode } from "react"
+import { createContext, useContext, useState, type ReactNode } from "react"
 import { useToast } from "@/hooks/use-toast"
 import type { Token } from "@/types/token"
 import { SolanaService } from "@/lib/solana-service"
@@ -51,14 +51,6 @@ export function WalletProvider({ children }: { children: ReactNode }) {
 
   const { toast } = useToast()
   const solanaService = new SolanaService()
-
-  useEffect(() => {
-    console.log("[v0] ========== STATE UPDATED ==========")
-    console.log("[v0] connected:", state.connected)
-    console.log("[v0] publicKey:", state.publicKey)
-    console.log("[v0] tokens:", state.tokens.length)
-    console.log("[v0] ====================================")
-  }, [state])
 
   const connect = async () => {
     setState((prev) => ({ ...prev, connecting: true, connectionError: null }))
@@ -153,7 +145,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         description: "You have been disconnected successfully",
       })
     } catch (error) {
-      console.error("[v0] Error disconnecting wallet:", error)
+      // Silent error handling for disconnect
     }
   }
 
@@ -172,7 +164,6 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         description: `Found ${fetchedTokens.length} tokens (${dustCount} below $5)`,
       })
     } catch (error) {
-      console.error("[v0] Error fetching tokens:", error)
       toast({
         title: "Error Loading Tokens",
         description: "Could not fetch your tokens. Please try again.",
@@ -204,7 +195,6 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         description: `Found ${fetchedTokens.length} token(s) below $5`,
       })
     } catch (error) {
-      console.error("[v0] Error refreshing tokens:", error)
       toast({
         title: "Refresh Failed",
         description: "Could not refresh your tokens. Please try again.",
