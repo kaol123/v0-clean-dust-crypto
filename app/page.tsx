@@ -3,7 +3,7 @@ import { Dashboard } from "@/components/dashboard"
 
 export default function Page() {
   return (
-    <main className="min-h-screen">
+    <main className="h-screen overflow-hidden flex flex-col">
       <Hero />
       <Dashboard />
     </main>
