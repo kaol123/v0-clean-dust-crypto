@@ -4,7 +4,7 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
 
-    console.log("[v0] Jupiter API Route v1.6.4 - Using direct fetch")
+    console.log("[v0] Jupiter API Route v1.6.6 - Server-side quote + swap")
 
     // Mode 1: Pre-fetched quote (hybrid mode) - receive quote, generate swap
     if (body.quote) {
@@ -67,56 +67,96 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "All swap endpoints failed" }, { status: 400 })
     }
 
-    // Mode 2: Full quote + swap
+    // Mode 2: Full quote + swap (server-side - no rate limiting issues)
     const { inputMint, outputMint, amount, userPublicKey, slippageBps = 500 } = body
 
-    console.log("[v0] Full mode - quote + swap")
+    console.log("[v0] Full mode - server-side quote + swap")
     console.log("[v0] Input:", inputMint, "Amount:", amount)
 
     if (!inputMint || !outputMint || !amount || !userPublicKey) {
       return NextResponse.json({ error: "Missing required parameters" }, { status: 400 })
     }
 
-    const quoteEndpoints = ["https://public.jupiterapi.com/quote", "https://quote-api.jup.ag/v6/quote"]
+    const quoteEndpoints = [
+      "https://public.jupiterapi.com/quote",
+      "https://quote-api.jup.ag/v6/quote",
+      "https://lite-api.jup.ag/swap/v1/quote",
+    ]
 
     let quote = null
-    for (const endpoint of quoteEndpoints) {
-      try {
-        const quoteUrl = `${endpoint}?inputMint=${inputMint}&outputMint=${outputMint}&amount=${amount}&slippageBps=${slippageBps}`
-        console.log(`[v0] Trying quote endpoint: ${endpoint}`)
+    let lastError = ""
 
-        const quoteResponse = await fetch(quoteUrl, {
-          headers: {
-            Accept: "application/json",
-          },
-        })
+    for (let retry = 0; retry < 3; retry++) {
+      for (const endpoint of quoteEndpoints) {
+        try {
+          const quoteUrl = `${endpoint}?inputMint=${inputMint}&outputMint=${outputMint}&amount=${amount}&slippageBps=${slippageBps}`
+          console.log(`[v0] Trying quote endpoint: ${endpoint} (attempt ${retry + 1})`)
 
-        if (quoteResponse.ok) {
-          const quoteText = await quoteResponse.text()
-          try {
-            quote = JSON.parse(quoteText)
-            if (quote && quote.outAmount) {
-              console.log(`[v0] Quote received from ${endpoint}! Output: ${quote.outAmount}`)
-              break
-            }
-          } catch {
-            console.log("[v0] Failed to parse quote response")
+          const quoteResponse = await fetch(quoteUrl, {
+            headers: {
+              Accept: "application/json",
+              "User-Agent": "CryptoDustCleaner/1.0",
+            },
+          })
+
+          if (quoteResponse.status === 429) {
+            console.log(`[v0] Rate limited on ${endpoint}, waiting...`)
+            await new Promise((resolve) => setTimeout(resolve, 2000))
+            continue
           }
-        } else {
-          console.log(`[v0] Quote endpoint failed with status: ${quoteResponse.status}`)
+
+          if (quoteResponse.ok) {
+            const quoteText = await quoteResponse.text()
+            try {
+              const parsed = JSON.parse(quoteText)
+              if (parsed && parsed.outAmount) {
+                // Clean quote
+                delete parsed.platformFee
+                delete parsed.platformFeeBps
+                quote = parsed
+                console.log(`[v0] Quote received from ${endpoint}! Output: ${quote.outAmount}`)
+                break
+              }
+            } catch {
+              console.log("[v0] Failed to parse quote response")
+            }
+          } else {
+            const errorText = await quoteResponse.text()
+            lastError = errorText.substring(0, 100)
+            console.log(`[v0] Quote endpoint failed: ${quoteResponse.status} - ${lastError}`)
+          }
+        } catch (e: any) {
+          console.log(`[v0] Quote endpoint error: ${e.message}`)
+          lastError = e.message
         }
-      } catch (e: any) {
-        console.log(`[v0] Quote endpoint error: ${e.message}`)
+      }
+
+      if (quote) break
+
+      // Wait before retry
+      if (retry < 2) {
+        console.log(`[v0] All endpoints failed, waiting 2s before retry...`)
+        await new Promise((resolve) => setTimeout(resolve, 2000))
       }
     }
 
     if (!quote || !quote.outAmount) {
       console.log("[v0] No quote available from any endpoint")
-      return NextResponse.json({ error: "No liquidity for this token", noLiquidity: true }, { status: 400 })
+      return NextResponse.json(
+        {
+          error: lastError || "No liquidity for this token",
+          noLiquidity: true,
+        },
+        { status: 400 },
+      )
     }
 
     // Get swap transaction
-    const swapEndpoints = ["https://public.jupiterapi.com/swap", "https://quote-api.jup.ag/v6/swap"]
+    const swapEndpoints = [
+      "https://public.jupiterapi.com/swap",
+      "https://quote-api.jup.ag/v6/swap",
+      "https://lite-api.jup.ag/swap/v1/swap",
+    ]
 
     for (const endpoint of swapEndpoints) {
       try {
@@ -127,6 +167,7 @@ export async function POST(request: NextRequest) {
           headers: {
             "Content-Type": "application/json",
             Accept: "application/json",
+            "User-Agent": "CryptoDustCleaner/1.0",
           },
           body: JSON.stringify({
             quoteResponse: quote,
@@ -148,7 +189,7 @@ export async function POST(request: NextRequest) {
           }
         } else {
           const errorText = await swapResponse.text()
-          console.log(`[v0] Swap endpoint failed: ${errorText.substring(0, 200)}`)
+          console.log(`[v0] Swap endpoint failed: ${swapResponse.status} - ${errorText.substring(0, 200)}`)
         }
       } catch (e: any) {
         console.log(`[v0] Swap endpoint error: ${e.message}`)

@@ -186,114 +186,44 @@ export class SolanaService {
     }
   }
 
-  private async getQuoteWithRetry(
-    inputMint: string,
-    outputMint: string,
-    amount: number,
-    slippageBps: number,
-    maxRetries = 3,
-  ): Promise<any | null> {
-    const endpoints = [
-      "https://public.jupiterapi.com/quote",
-      "https://quote-api.jup.ag/v6/quote",
-      "https://api.jup.ag/swap/v1/quote",
-    ]
-
-    for (let retry = 0; retry < maxRetries; retry++) {
-      for (const endpoint of endpoints) {
-        try {
-          const quoteUrl = `${endpoint}?inputMint=${inputMint}&outputMint=${outputMint}&amount=${amount}&slippageBps=${slippageBps}`
-          console.log(`[v0] Trying quote from ${endpoint} (attempt ${retry + 1})...`)
-
-          const quoteResponse = await fetch(quoteUrl, {
-            method: "GET",
-            headers: { Accept: "application/json" },
-          })
-
-          if (quoteResponse.status === 429) {
-            console.log(`[v0] Rate limited on ${endpoint}, trying next...`)
-            await new Promise((resolve) => setTimeout(resolve, 500))
-            continue
-          }
-
-          if (!quoteResponse.ok) {
-            console.log(`[v0] Quote failed on ${endpoint}: ${quoteResponse.status}`)
-            continue
-          }
-
-          const quoteText = await quoteResponse.text()
-
-          if (quoteText.startsWith("<!") || quoteText.startsWith("<") || quoteText.includes("Invalid")) {
-            console.log(`[v0] Invalid response from ${endpoint}`)
-            continue
-          }
-
-          const quote = JSON.parse(quoteText)
-
-          if (!quote || !quote.outAmount) {
-            console.log(`[v0] No outAmount in quote from ${endpoint}`)
-            continue
-          }
-
-          // Remove platformFee fields to avoid feeAccount error
-          if (quote.platformFee) delete quote.platformFee
-          if (quote.platformFeeBps !== undefined) delete quote.platformFeeBps
-
-          console.log(`[v0] Quote received from ${endpoint}! outAmount: ${quote.outAmount}`)
-          return quote
-        } catch (e: any) {
-          console.log(`[v0] Error fetching quote from ${endpoint}: ${e.message}`)
-          continue
-        }
-      }
-
-      // Wait before next retry round
-      if (retry < maxRetries - 1) {
-        console.log(`[v0] All endpoints failed, waiting before retry ${retry + 2}...`)
-        await new Promise((resolve) => setTimeout(resolve, 1000))
-      }
-    }
-
-    return null
-  }
-
-  private async tryHybridJupiterSwap(
+  private async getSwapViaApiRoute(
     inputMint: string,
     outputMint: string,
     amount: number,
     userPublicKey: string,
     slippageBps = 500,
   ): Promise<{ swapTransaction: string; outAmount: string } | null> {
-    const quote = await this.getQuoteWithRetry(inputMint, outputMint, amount, slippageBps)
-
-    if (!quote) {
-      console.log("[v0] All quote attempts failed")
-      return null
-    }
-
-    // Passo 2: Enviar quote para API route gerar transacao de swap
     try {
-      console.log("[v0] Sending quote to API route for swap transaction...")
+      console.log(`[v0] Calling API route for quote + swap...`)
+
       const apiResponse = await fetch("/api/jupiter-swap", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          quote,
+          inputMint,
+          outputMint,
+          amount,
           userPublicKey,
+          slippageBps,
         }),
       })
 
       if (!apiResponse.ok) {
         const errorData = await apiResponse.json().catch(() => ({}))
-        console.log("[v0] API route swap failed:", errorData.error || apiResponse.status)
+        console.log("[v0] API route failed:", errorData.error || apiResponse.status)
+
+        if (errorData.noLiquidity) {
+          return null
+        }
+
         return null
       }
 
       const data = await apiResponse.json()
 
       if (data.swapTransaction) {
-        console.log("[v0] Swap transaction generated successfully!")
-        return { swapTransaction: data.swapTransaction, outAmount: quote.outAmount }
+        console.log("[v0] Swap transaction received from API route! outAmount:", data.outAmount)
+        return { swapTransaction: data.swapTransaction, outAmount: data.outAmount }
       }
 
       return null
@@ -341,7 +271,7 @@ export class SolanaService {
             continue
           }
 
-          const swapResult = await this.tryHybridJupiterSwap(
+          const swapResult = await this.getSwapViaApiRoute(
             token.mint,
             "So11111111111111111111111111111111111111112",
             inputAmount,
