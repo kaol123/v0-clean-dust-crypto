@@ -8,7 +8,7 @@ export default function Page() {
 
   return (
     <main className={`min-h-screen flex flex-col ${connected ? "overflow-auto" : "overflow-hidden h-screen"}`}>
-      {!connected && <Hero />}
+      <Hero compact={connected} />
       <Dashboard />
     </main>
   )
